@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 
 const PostSchema = new mongoose.Schema({
     userId: {
-        // Tham chiếu đến ID của người dùng đã tạo bài đăng
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
@@ -12,10 +11,9 @@ const PostSchema = new mongoose.Schema({
         max: 500
     },
     image: {
-        type: String // URL hoặc path của ảnh/video
+        type: String 
     },
     likes: {
-        // Mảng chứa ID của người dùng đã thích bài đăng này
         type: Array,
         default: []
     },

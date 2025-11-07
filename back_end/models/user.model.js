@@ -21,22 +21,31 @@ const UserSchema = new mongoose.Schema({
     },
     profilePicture: {
         type: String,
-        default: "" // URL ảnh đại diện
+        default: "" 
     },
     coverPicture: {
         type: String,
-        default: "" // URL ảnh bìa
+        default: "" 
     },
     followers: {
-        type: Array,
+        type: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        }],
         default: []
     },
     following: {
-        type: Array,
+        type: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        }],
         default: []
     },
     friends: {
-        type: Array,
+        type: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        }],
         default: []
     },
     isAdmin: {
@@ -45,7 +54,7 @@ const UserSchema = new mongoose.Schema({
     },
     desc: {
         type: String,
-        max: 50,
+        max: 150, // Tăng max length cho mô tả
         default: "" // Mô tả bản thân
     },
     city: {
@@ -59,7 +68,7 @@ const UserSchema = new mongoose.Schema({
         default: "" // Nơi sinh sống
     }
 },
-{ timestamps: true } // Tự động thêm createdAt và updatedAt
+    { timestamps: true }
 );
 
 module.exports = mongoose.model("User", UserSchema);

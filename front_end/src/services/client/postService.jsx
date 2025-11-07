@@ -3,10 +3,8 @@ import { getAuth, postAuth, delAuth, putAuth } from "../../utils/request";
 const API_POSTS_PATH = "/posts";
 
 export const getTimelinePosts = async (userId) => {
-    console.log("Fetching timeline posts for userId:", userId);
     const path = `${API_POSTS_PATH}/timeline/${userId}`;
     const result = await getAuth(path); 
-    console.log("Received timeline posts data:", result);
     return result; 
 
 };

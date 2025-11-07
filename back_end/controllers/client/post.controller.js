@@ -1,7 +1,7 @@
 const Post = require('../../models/post.model');
 const User = require('../../models/user.model');
 
-// [POST] /api/posts
+// [POST] /posts
 exports.createPost = async (req, res) => {
     const { userId, content, image } = req.body; 
     
@@ -23,7 +23,7 @@ exports.createPost = async (req, res) => {
     }
 };
 
-// [PUT] /api/posts/:id 
+// [PUT] /posts/:id 
 exports.updatePost = async (req, res) => {
     const postId = req.params.id;
     const { userId, content, image } = req.body; 
@@ -55,7 +55,7 @@ exports.updatePost = async (req, res) => {
     }
 };
 
-//[DELETE] /api/posts/:id 
+//[DELETE] /posts/:id 
 exports.deletePost = async (req, res) => {
     const postId = req.params.id;
     const { userId } = req.body; 
@@ -80,7 +80,7 @@ exports.deletePost = async (req, res) => {
     }
 };
 
-//[PUT] /api/posts/:id/like
+//[PUT] /posts/:id/like
 exports.likePost = async (req, res) => {
     const postId = req.params.id;
     const { userId } = req.body; 
@@ -105,7 +105,7 @@ exports.likePost = async (req, res) => {
     }
 };
 
-// [GET] /api/posts/:id 
+// [GET] /posts/:id 
 exports.getPost = async (req, res) => {
     try {
         const post = await Post.findById(req.params.id)
@@ -122,25 +122,33 @@ exports.getPost = async (req, res) => {
     }
 };
 
-//[GET] /api/posts/timeline/:userId 
+//[GET] /posts/timeline/:userId 
 exports.getTimelinePosts = async (req, res) => {
-    console.log("getTimelinePosts called");
     const currentUserId = req.params.userId;
-
     try {
-        const currentUserPosts = await Post.find({ userId: currentUserId }).sort({ createdAt: -1 });
-
         const currentUser = await User.findById(currentUserId);
-        const friendIds = currentUser ? currentUser.followings : []; 
+        if (!currentUser) {
+            return res.status(404).json({ message: "Người dùng không tồn tại." });
+        }
+        const followingIds = currentUser.following || []; 
+        const friendIds = currentUser.friends || []; 
+        const allRelevantIds = [...new Set([...followingIds, ...friendIds])];
+        const [currentUserPosts, externalPosts] = await Promise.all([
+            
+            Post.find({ userId: currentUserId })
+                .populate('userId', 'username profilePicture') 
+                .sort({ createdAt: -1 })
+                .exec(), 
+            
+            Post.find({ userId: { $in: allRelevantIds } })
+                .populate('userId', 'username profilePicture') 
+                .sort({ createdAt: -1 })
+                .limit(50)
+                .exec()
+        ]);
 
-        const friendPosts = await Post.find({ userId: { $in: friendIds } })
-            .populate('userId', 'username profilePicture') 
-            .sort({ createdAt: -1 })
-            .limit(50); 
-
-        const allPosts = currentUserPosts.concat(friendPosts);
-        allPosts.sort((a, b) => b.createdAt - a.createdAt);
-
+        const allPosts = currentUserPosts.concat(externalPosts);
+        allPosts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         res.status(200).json(allPosts);
     } catch (err) {
         console.error("Lỗi khi lấy dòng thời gian:", err);

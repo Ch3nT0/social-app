@@ -1,9 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const controller = require("../../controllers/client/auth.controller");
+const controller = require("../../controllers/client/user.controller");
 
-router.post('/register', controller.registerUser);
-router.post('/login', controller.loginUser);
+router.get('/:id', controller.getUser);
+router.put('/:id', controller.updateUser);
+router.delete('/:id', controller.deleteUser);
+router.put('/:id/follow', controller.followUser);
+router.put('/:id/unfollow', controller.unfollowUser);
+router.get('/:id/friends/:userId', controller.getFriends);
 
 
 module.exports = router;
