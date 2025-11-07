@@ -124,6 +124,7 @@ exports.getPost = async (req, res) => {
 
 //[GET] /api/posts/timeline/:userId 
 exports.getTimelinePosts = async (req, res) => {
+    console.log("getTimelinePosts called");
     const currentUserId = req.params.userId;
 
     try {
