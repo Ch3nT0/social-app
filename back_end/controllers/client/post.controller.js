@@ -3,8 +3,8 @@ const User = require('../../models/user.model');
 
 // [POST] /posts
 exports.createPost = async (req, res) => {
-    const { userId, content, image } = req.body; 
-    
+    const { userId, content, image } = req.body;
+
     try {
         const newPost = new Post({
             userId,
@@ -13,7 +13,7 @@ exports.createPost = async (req, res) => {
         });
 
         const savedPost = await newPost.save();
-        res.status(201).json({ 
+        res.status(201).json({
             message: "Bài đăng đã được tạo thành công.",
             post: savedPost
         });
@@ -26,26 +26,26 @@ exports.createPost = async (req, res) => {
 // [PUT] /posts/:id 
 exports.updatePost = async (req, res) => {
     const postId = req.params.id;
-    const { userId, content, image } = req.body; 
+    const { userId, content, image } = req.body;
 
     try {
         const post = await Post.findById(postId);
-        
+
         if (!post) {
             return res.status(404).json({ message: "Bài đăng không tồn tại." });
         }
 
-        if (post.userId.toString() !== userId) { 
+        if (post.userId.toString() !== userId) {
             return res.status(403).json({ message: "Bạn chỉ có thể cập nhật bài đăng của mình." });
         }
 
         const updatedPost = await Post.findByIdAndUpdate(
             postId,
-            { $set: { content, image } }, 
-            { new: true } 
+            { $set: { content, image } },
+            { new: true }
         );
 
-        res.status(200).json({ 
+        res.status(200).json({
             message: "Bài đăng đã được cập nhật thành công.",
             post: updatedPost
         });
@@ -58,11 +58,11 @@ exports.updatePost = async (req, res) => {
 //[DELETE] /posts/:id 
 exports.deletePost = async (req, res) => {
     const postId = req.params.id;
-    const { userId } = req.body; 
+    const { userId } = req.body;
 
     try {
         const post = await Post.findById(postId);
-        
+
         if (!post) {
             return res.status(404).json({ message: "Bài đăng không tồn tại." });
         }
@@ -83,15 +83,13 @@ exports.deletePost = async (req, res) => {
 //[PUT] /posts/:id/like
 exports.likePost = async (req, res) => {
     const postId = req.params.id;
-    const { userId } = req.body; 
-
+    const  userId  = req.user.userId;
     try {
         const post = await Post.findById(postId);
-        
         if (!post) {
-             return res.status(404).json({ message: "Bài đăng không tồn tại." });
+            return res.status(404).json({ message: "Bài đăng không tồn tại." });
         }
-        
+
         if (!post.likes.includes(userId)) {
             await post.updateOne({ $push: { likes: userId } });
             res.status(200).json({ message: "Bài đăng đã được thích (Like)." });
@@ -109,7 +107,7 @@ exports.likePost = async (req, res) => {
 exports.getPost = async (req, res) => {
     try {
         const post = await Post.findById(req.params.id)
-            .populate('userId', 'username email profilePicture'); 
+            .populate('userId', 'username email profilePicture');
 
         if (!post) {
             return res.status(404).json({ message: "Bài đăng không tồn tại." });
@@ -130,18 +128,18 @@ exports.getTimelinePosts = async (req, res) => {
         if (!currentUser) {
             return res.status(404).json({ message: "Người dùng không tồn tại." });
         }
-        const followingIds = currentUser.following || []; 
-        const friendIds = currentUser.friends || []; 
+        const followingIds = currentUser.following || [];
+        const friendIds = currentUser.friends || [];
         const allRelevantIds = [...new Set([...followingIds, ...friendIds])];
         const [currentUserPosts, externalPosts] = await Promise.all([
-            
+
             Post.find({ userId: currentUserId })
-                .populate('userId', 'username profilePicture') 
+                .populate('userId', 'username profilePicture')
                 .sort({ createdAt: -1 })
-                .exec(), 
-            
+                .exec(),
+
             Post.find({ userId: { $in: allRelevantIds } })
-                .populate('userId', 'username profilePicture') 
+                .populate('userId', 'username profilePicture')
                 .sort({ createdAt: -1 })
                 .limit(50)
                 .exec()
@@ -152,6 +150,22 @@ exports.getTimelinePosts = async (req, res) => {
         res.status(200).json(allPosts);
     } catch (err) {
         console.error("Lỗi khi lấy dòng thời gian:", err);
+        res.status(500).json({ message: "Lỗi Server nội bộ.", error: err.message });
+    }
+};
+
+// [GET] /posts/user/:userId
+exports.getUserPosts = async (req, res) => {
+    const userId = req.params.userId;
+    
+    try {
+        const userPosts = await Post.find({ userId: userId })
+            .populate('userId', 'username profilePicture') 
+            .sort({ createdAt: -1 });
+
+        res.status(200).json(userPosts);
+    } catch (err) {
+        console.error("Lỗi khi lấy bài đăng của người dùng:", err);
         res.status(500).json({ message: "Lỗi Server nội bộ.", error: err.message });
     }
 };

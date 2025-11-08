@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import Post from '../../../components/Post/Post';
 import Share from '../../../components/Share/Share';
 import { getUserProfile } from '../../../services/client/userService'; 
-import { getTimelinePosts } from '../../../services/client/postService'; 
+import { getUserPosts } from '../../../services/client/postService'; 
 
 const Profile = () => {
     const { id: profileId } = useParams(); 
@@ -32,7 +32,7 @@ const Profile = () => {
                     setIsFollowing(userData.followers.includes(CURRENT_USER_ID));
                 }
                 
-                const userPosts = await getTimelinePosts(profileId); 
+                const userPosts = await getUserPosts(profileId); 
 
                 if (Array.isArray(userPosts)) {
                     setPosts(userPosts.sort((p1, p2) => new Date(p2.createdAt) - new Date(p1.createdAt)));

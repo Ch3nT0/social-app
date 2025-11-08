@@ -1,20 +1,79 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { likePost } from '../../services/client/postService'; 
+import { getCookie } from '../../helpers/cookie';
+import CommentSection from './commentSection'; 
+
+const getUserId = () => {
+    return getCookie('userId') || null; 
+};
 
 const Post = ({ post }) => {
-    const posterId = post.userId?._id;
-    const username = post.userId?.username || "Người dùng";
-    const isPopulated = typeof post.userId === 'object' && post.userId !== null && post.userId._id;
+    const [postData, setPostData] = useState(post); 
+    
+    const [isLiked, setIsLiked] = useState(false);
+    const [showComments, setShowComments] = useState(false); 
+    
+    const currentUserId = getUserId(); 
+    
+    const posterId = postData.userId?._id;
+    const username = postData.userId?.username || "Người dùng";
+    const isPopulated = typeof postData.userId === 'object' && postData.userId !== null && postData.userId._id;
+
+
+    useEffect(() => {
+        if (currentUserId && postData.likes.includes(currentUserId)) {
+            setIsLiked(true);
+        } else {
+            setIsLiked(false);
+        }
+    }, [postData.likes, currentUserId]);
+
+
+    const handleLike = async () => {
+        if (!currentUserId) {
+            alert("Vui lòng đăng nhập để thực hiện hành động này.");
+            return;
+        }
+
+        const previousIsLiked = isLiked;
+        const previousLikes = postData.likes;
+
+        setIsLiked(!isLiked);
+        setPostData(prev => ({
+            ...prev,
+            likes: isLiked 
+                ? prev.likes.filter(id => id !== currentUserId) 
+                : [...prev.likes, currentUserId] 
+        }));
+
+        try {
+            await likePost(postData._id); 
+
+        } catch (error) {
+            console.error("Lỗi khi thích bài đăng:", error);
+            setIsLiked(previousIsLiked);
+            setPostData(prev => ({ ...prev, likes: previousLikes }));
+            alert("Có lỗi xảy ra, không thể thích/bỏ thích bài đăng.");
+        }
+    };
+    
+    const handleCommentCountChange = (change) => {
+        setPostData(prev => ({
+            ...prev,
+            commentsCount: (prev.commentsCount || 0) + change
+        }));
+    };
+
 
     return (
         <div className="bg-white rounded-xl shadow-lg p-5 border border-gray-200">
 
-            {/* Header Post (Avatar, Tên, Thời gian) */}
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center space-x-3">
                     <img
                         className="w-10 h-10 rounded-full object-cover"
-                        src={post.userId?.profilePicture || "https://via.placeholder.com/150/0000FF/FFFFFF?text=U"}
+                        src={postData.userId?.profilePicture || "https://via.placeholder.com/150/0000FF/FFFFFF?text=U"}
                         alt="User Avatar"
                     />
                     <div>
@@ -29,41 +88,64 @@ const Post = ({ post }) => {
                             <span className="font-semibold text-gray-800">{username}</span>
                         )}
 
-                        <div className="text-xs text-gray-500">{new Date(post.createdAt).toLocaleDateString('vi-VN')}</div>
+                        <div className="text-xs text-gray-500">{new Date(postData.createdAt).toLocaleDateString('vi-VN')}</div>
                     </div>
                 </div>
                 <button className="text-gray-400 hover:text-gray-600">...</button>
             </div>
 
-            <p className="text-gray-700 mb-4">{post.content}</p>
+            <p className="text-gray-700 mb-4">{postData.content}</p>
 
-            {post.image && (
+            {postData.image && (
                 <img
                     className="w-full max-h-96 object-contain rounded-lg mb-4"
-                    src={post.image}
+                    src={postData.image}
                     alt="Post Content"
                 />
             )}
 
+            {/* Footer - Stats and Actions */}
             <div className="flex justify-between items-center border-t border-gray-200 pt-3">
 
+                {/* Stats (Likes & Comments) */}
                 <div className="text-sm text-gray-500">
-                    <span className="mr-4">❤️ {post.likes.length} Thích</span>
-                    <span>💬 {post.commentsCount} Bình luận</span>
+                    <span className={`mr-4 ${isLiked ? 'text-red-500' : 'text-gray-500'}`}>
+                        ❤️ {postData.likes.length} Thích
+                    </span>
+                    <button onClick={() => setShowComments(prev => !prev)} className='hover:underline'>
+                        💬 {postData.commentsCount} Bình luận
+                    </button>
                 </div>
 
+                {/* Actions (Like, Comment, Share) */}
                 <div className="flex space-x-4">
-                    <button className="flex items-center space-x-1 text-gray-600 hover:text-blue-600 transition duration-150">
-                        <span>👍</span> <span className="text-sm">Thích</span>
+                    <button 
+                        onClick={handleLike}
+                        className={`flex items-center space-x-1 transition duration-150 ${
+                            isLiked ? 'text-red-500 font-semibold' : 'text-gray-600 hover:text-blue-600'
+                        }`}
+                    >
+                        <span>👍</span> <span className="text-sm">{isLiked ? 'Đã thích' : 'Thích'}</span>
                     </button>
-                    <button className="flex items-center space-x-1 text-gray-600 hover:text-blue-600 transition duration-150">
+                    
+                    <button onClick={() => setShowComments(prev => !prev)} className="flex items-center space-x-1 text-gray-600 hover:text-blue-600 transition duration-150">
                         <span>💬</span> <span className="text-sm">Bình luận</span>
                     </button>
+                    
                     <button className="flex items-center space-x-1 text-gray-600 hover:text-blue-600 transition duration-150">
                         <span>📤</span> <span className="text-sm">Chia sẻ</span>
                     </button>
                 </div>
             </div>
+            
+            {/* ⭐️ Comment Section Integration */}
+            {showComments && (
+                <CommentSection 
+                    postId={postData._id} 
+                    postOwnerId={posterId} 
+                    onCommentCountChange={handleCommentCountChange} 
+                />
+            )}
         </div>
     );
 };

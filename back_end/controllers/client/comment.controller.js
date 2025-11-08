@@ -1,29 +1,32 @@
 const Comment = require('../../models/comment.model');
 const Post = require('../../models/post.model'); 
 
-
-///api/comments 
+// [POST] /comments
 exports.createComment = async (req, res) => {
-    const { postId, userId, text } = req.body;     
+    const userId = req.user?.id || req.body.userId; 
+    const { postId, text } = req.body; 
+    
+    if (!userId) {
+        return res.status(401).json({ message: "Yêu cầu xác thực để bình luận." });
+    }
+    
     try {
         const post = await Post.findById(postId);
         if (!post) {
             return res.status(404).json({ message: "Bài đăng không tồn tại để bình luận." });
         }
 
-        const newComment = new Comment({
-            postId,
-            userId, 
-            text
-        });
-
+        const newComment = new Comment({ postId, userId, text });
         const savedComment = await newComment.save();
         
         await Post.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } }); 
 
+        const populatedComment = await Comment.findById(savedComment._id)
+            .populate('userId', 'username profilePicture');
+            
         res.status(201).json({ 
             message: "Bình luận đã được tạo thành công.",
-            comment: savedComment
+            comment: populatedComment
         });
     } catch (err) {
         console.error("Lỗi khi tạo bình luận:", err);
@@ -31,10 +34,14 @@ exports.createComment = async (req, res) => {
     }
 };
 
-//[DELETE] /api/comments/:id
+// [DELETE] /comments/:id
 exports.deleteComment = async (req, res) => {
     const commentId = req.params.id;
-    const { userId } = req.body; 
+    const userId = req.user?.userId || req.body.userId; 
+    if (!userId) {
+        return res.status(401).json({ message: "Yêu cầu xác thực để xóa." });
+    }
+    
     try {
         const comment = await Comment.findById(commentId);
         
@@ -64,7 +71,7 @@ exports.deleteComment = async (req, res) => {
     }
 };
 
-//[GET] /api/comments/:postId 
+// [GET] /comments/:postId - Lấy danh sách bình luận
 exports.getCommentsByPost = async (req, res) => {
     const postId = req.params.postId;
     
@@ -73,11 +80,8 @@ exports.getCommentsByPost = async (req, res) => {
             .populate('userId', 'username profilePicture') 
             .sort({ createdAt: 1 }); 
         
-        if (comments.length === 0) {
-            return res.status(200).json({ message: "Bài đăng chưa có bình luận nào.", comments: [] });
-        }
-
-        res.status(200).json(comments);
+        res.status(200).json(comments); 
+        
     } catch (err) {
         console.error("Lỗi khi lấy bình luận:", err);
         res.status(500).json({ message: "Lỗi Server nội bộ.", error: err.message });

@@ -1,14 +1,10 @@
-// src/pages/client/home.jsx
-
 import React, { useState, useEffect } from 'react';
 import Post from '../../../components/Post/Post'; 
 import Share from '../../../components/Share/Share'; 
 import { getTimelinePosts } from '../../../services/client/postService'; 
-// Import helper và service cần thiết
 import { getCookie } from '../../../helpers/cookie';
 import { getUserProfile } from '../../../services/client/userService';
 
-// Hàm helper để lấy ID người dùng từ cookie
 const getUserId = () => {
     return getCookie('userId') || null; 
 };

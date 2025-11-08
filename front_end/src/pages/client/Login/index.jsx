@@ -28,15 +28,11 @@ const Login = () => {
             
             if (result && result.accessToken) {
 
-                // Lưu Token vào cookie (Thời hạn 7 ngày)
                 setCookie('token', result.accessToken, 7);
                 
-                // ⭐️ BƯỚC FIX: LƯU USER ID VÀO COOKIE
                 if (result.user && result.user._id) {
-                    // Giả định backend trả về { user: { _id: '...' } }
                     setCookie('userId', result.user._id, 7); 
                 } else if (result.userId) {
-                    // Trường hợp backend trả về userId trực tiếp
                     setCookie('userId', result.userId, 7); 
                 }
                 

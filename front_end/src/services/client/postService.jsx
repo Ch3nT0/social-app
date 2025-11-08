@@ -6,7 +6,6 @@ export const getTimelinePosts = async (userId) => {
     const path = `${API_POSTS_PATH}/timeline/${userId}`;
     const result = await getAuth(path); 
     return result; 
-
 };
 
 export const createPost = async (postData) => {
@@ -27,3 +26,9 @@ export const deletePost = async (postId) => {
     const result = await delAuth(path); 
     return result;
 };
+
+export const getUserPosts = async (userId) => {
+    const path = `${API_POSTS_PATH}/user/${userId}`;
+    const result = await getAuth(path); 
+    return result; 
+}
