@@ -4,31 +4,42 @@ import Home from "../pages/client/home";
 import Profile from "../pages/client/profile";
 import Login from "../pages/client/Login";
 import Register from "../pages/client/register";
+import SearchFriendsPage from "../pages/client/SearchFriendsPage";
+
 
 const URL_ADMIN = '/admin'
 
 export const routes = [
     {
         path: '/',
-        element: <LayoutDefault />,
-        children: [{
-            path: '/',
-            element: <Home />
-        }, {
-            path: '/profile/:id',
-            element: <Profile />
-        }
+        element: <LayoutDefault />, 
+        children: [
+            {
+                path: '/', 
+                element: <Home />
+            }, 
+            {
+                path: '/profile/:id',
+                element: <Profile />
+            },
+            {
+                path: '/search/friends', 
+                element: <SearchFriendsPage />
+            }
         ]
-    }, {
+    }, 
+    {
         path: '/login',
         element: <Login />
-    }, {
+    }, 
+    {
         path: '/register',
         element: <Register />
     },
     {
         path: URL_ADMIN,
         element: <LayoutAdmin />,
-        children: []
+        children: [
+        ]
     }
-]
+];

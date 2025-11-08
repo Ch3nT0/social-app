@@ -7,5 +7,6 @@ router.put("/accept/:requestId", verifyToken, controller.acceptFriendRequest);
 router.put("/reject/:requestId", verifyToken, controller.rejectFriendRequest);
 router.delete("/cancel/:requestId", verifyToken, controller.cancelFriendRequest);
 router.get("/requests/:userId", verifyToken, controller.getPendingRequests); 
+router.delete("/:friendId/unfriend", verifyToken, controller.unfriendUser);
 
 module.exports = router;

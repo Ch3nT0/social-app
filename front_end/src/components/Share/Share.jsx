@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPost } from '../../services/client/postService'; 
 import { getCookie } from '../../helpers/cookie';
-import { handleUpload } from '../../helpers/uploaFileToCloud';
+import { handleUpload } from '../../helpers/uploaFileToCloud'; 
 
 const getUserId = () => {
     return getCookie('userId') || null; 
@@ -16,7 +16,6 @@ const Share = ({ onPostCreated, userAvatar, userName }) => {
     
     const displayAvatar = userAvatar || "https://via.placeholder.com/150/FF0000/FFFFFF?text=U"; 
     
-    // Tạo preview URL (sẽ được giải phóng khi component unmount)
     const filePreviewUrl = file ? URL.createObjectURL(file) : null;
 
     const handleSubmit = async (e) => {
@@ -31,47 +30,47 @@ const Share = ({ onPostCreated, userAvatar, userName }) => {
 
         setIsUploading(true);
         let postData = {};
-        let uploadedImageUrl = ""; // Biến lưu URL sau khi tải lên
+        let uploadedImageUrl = "";
 
         try {
-            // 1. TẢI FILE LÊN CLOUDINARY (nếu có)
             if (file) {
-                // Determine file type for Cloudinary endpoint (image or video)
                 const fileType = file.type.startsWith('video/') ? "video" : "image";
-                
-                // Gọi hàm handleUpload
                 uploadedImageUrl = await handleUpload(file, fileType); 
 
                 if (!uploadedImageUrl) {
-                    // Nếu handleUpload không ném lỗi nhưng trả về null (rất hiếm nếu hàm throw lỗi)
                     throw new Error("Không nhận được URL từ dịch vụ lưu trữ.");
                 }
             }
             
-            // 2. TẠO DỮ LIỆU BÀI ĐĂNG VỚI URL ĐÃ TẢI LÊN
             postData = {
                 userId: currentUserId, 
                 content: content,
-                image: uploadedImageUrl || "" // Gán URL đã tải lên hoặc chuỗi rỗng
+                image: uploadedImageUrl || "" 
             };
             
             console.log("Creating post with data:", postData);
             
-            // 3. GỌI API BACKEND
             const result = await createPost(postData);
             
             if (result && result.post) {
                 alert("Đăng bài thành công!");
                 
-                // Thêm URL ảnh đã tải lên vào bài đăng trả về nếu cần thiết
-                const finalPost = { ...result.post, image: uploadedImageUrl || "" }; 
+                const populatedUser = {
+                    _id: currentUserId,
+                    username: userName,
+                    profilePicture: userAvatar
+                };
+                
+                const finalPost = { 
+                    ...result.post, 
+                    userId: populatedUser, 
+                    image: uploadedImageUrl || "" 
+                }; 
 
                 if (onPostCreated) {
-                    // Truyền bài đăng đã tạo để cập nhật Feed
                     onPostCreated(finalPost); 
                 }
                 
-                // Reset form
                 setContent('');
                 setFile(null);
             } else {
@@ -79,7 +78,6 @@ const Share = ({ onPostCreated, userAvatar, userName }) => {
             }
 
         } catch (error) {
-            // Lỗi tải lên hoặc lỗi API
             const errorMessage = error.message.includes("Tải file thất bại") 
                                 ? error.message 
                                 : "Có lỗi xảy ra khi tạo bài đăng.";
@@ -126,7 +124,6 @@ const Share = ({ onPostCreated, userAvatar, userName }) => {
                             {file.type.startsWith('image/') && (
                                 <img src={filePreviewUrl} alt="Preview" className="max-h-20 w-auto mt-2 rounded" />
                             )}
-                            {/* Tùy chọn: Thêm preview cho video nếu cần */}
                         </div>
                     )}
                 </form>
@@ -148,6 +145,13 @@ const Share = ({ onPostCreated, userAvatar, userName }) => {
                         />
                     </label>
 
+                    <button type="button" className="flex items-center space-x-1 text-blue-500 hover:text-blue-600 transition duration-150">
+                        <span>🏷️ Gắn thẻ</span>
+                    </button>
+                    
+                    <button type="button" className="flex items-center space-x-1 text-yellow-500 hover:text-yellow-600 transition duration-150 hidden sm:flex">
+                        <span>😊 Cảm xúc</span>
+                    </button>
                 </div>
                 
                 <button 

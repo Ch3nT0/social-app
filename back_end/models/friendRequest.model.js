@@ -2,13 +2,11 @@ const mongoose = require('mongoose');
 
 const FriendRequestSchema = new mongoose.Schema({
     senderId: {
-        // ID của người gửi lời mời
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
     },
     receiverId: {
-        // ID của người nhận lời mời
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
@@ -23,7 +21,6 @@ const FriendRequestSchema = new mongoose.Schema({
 { timestamps: true }
 );
 
-// Đảm bảo không có lời mời trùng lặp giữa hai người dùng
 FriendRequestSchema.index({ senderId: 1, receiverId: 1 }, { unique: true });
 
 module.exports = mongoose.model("FriendRequest", FriendRequestSchema);

@@ -12,13 +12,12 @@ const Navbar = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
+    
+    const [searchTerm, setSearchTerm] = useState(''); 
 
     const currentUserId = getUserId();
-
     const menuRef = useRef(null);
-
-    const FALLBACK_AVATAR = "";
-
+    const FALLBACK_AVATAR = "https://via.placeholder.com/150/CCCCCC/FFFFFF?text=P";
 
     useEffect(() => {
         const token = getCookie('token');
@@ -33,12 +32,11 @@ const Navbar = () => {
                     if (user && user._id) {
                         setCurrentUser(user);
                     } else {
-                        // Nếu API trả về lỗi 404/403 (mặc dù token có), đăng xuất
                         handleLogout(false);
                     }
                 } catch (error) {
                     console.error("Lỗi khi tải thông tin người dùng cho Navbar:", error);
-                    handleLogout(false); // Đăng xuất nếu lỗi mạng hoặc lỗi xác thực
+                    handleLogout(false);
                 }
             };
             fetchUserProfile();
@@ -57,7 +55,6 @@ const Navbar = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isMenuOpen]);
 
-    // Hàm đăng xuất
     const handleLogout = (shouldNavigate = true) => {
         deleteCookie('token');
         deleteCookie('userId');
@@ -72,7 +69,15 @@ const Navbar = () => {
         setIsMenuOpen(prev => !prev);
     };
 
-    // Dữ liệu hiển thị
+    const handleSearchSubmit = (e) => {
+        e.preventDefault();
+        const trimmedKeyword = searchTerm.trim();
+        if (trimmedKeyword) {
+            navigate(`/search/friends?q=${encodeURIComponent(trimmedKeyword)}`);
+            setSearchTerm(''); 
+        }
+    };
+
     const profileLink = `/profile/${currentUserId || '#'}`;
     const avatarSrc = currentUser?.profilePicture || FALLBACK_AVATAR;
 
@@ -88,11 +93,15 @@ const Navbar = () => {
 
             {isAuthenticated && (
                 <div className="hidden sm:block flex-1 max-w-md mx-4">
-                    <input
-                        type="text"
-                        placeholder="Tìm kiếm bạn bè, bài đăng..."
-                        className="w-full p-2.5 bg-gray-100 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300 transition duration-150 text-sm"
-                    />
+                    <form onSubmit={handleSearchSubmit}>
+                        <input
+                            type="text"
+                            placeholder="Tìm kiếm bạn bè, bài đăng..."
+                            className="w-full p-2.5 bg-gray-100 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300 transition duration-150 text-sm"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </form>
                 </div>
             )}
 

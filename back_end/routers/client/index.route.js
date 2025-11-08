@@ -8,6 +8,6 @@ module.exports = (app)=>{
     app.use("/auth",authRoute);
     app.use("/posts",postRoute);
     app.use("/comments",commentRoute);
-    app.use("/friend-requests",friendRequestRoute);
+    app.use("/friends",friendRequestRoute);
     app.use("/users",userRoute);
 }
