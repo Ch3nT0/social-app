@@ -1,3 +1,4 @@
+const FriendRequest = require('../../models/friendRequest.model');
 const User = require('../../models/user.model');
 const bcrypt = require('bcrypt');
 
@@ -150,7 +151,7 @@ exports.unfollowUser = async (req, res) => {
 // [GET] /api/users/search?q=keyword
 exports.searchUsers = async (req, res) => {
     const keyword = req.query.q;
-    const currentUserId = req.user?.id;
+    const currentUserId = req.user?.userId;
     if (!keyword || keyword.length < 2) {
         return res.status(200).json([]);
     }
@@ -166,7 +167,6 @@ exports.searchUsers = async (req, res) => {
             .select('_id username profilePicture city friends')
             .limit(20)
             .lean();
-
         if (!currentUserId || searchResults.length === 0) {
             return res.status(200).json(searchResults.map(user => ({ ...user, friendshipStatus: 'none' })));
         }
@@ -180,7 +180,6 @@ exports.searchUsers = async (req, res) => {
                 { senderId: { $in: resultUserIds }, receiverId: currentUserId }
             ]
         });
-
         const finalResults = searchResults.map(user => {
             if (user.friends.includes(currentUserId)) {
                 return { ...user, friendshipStatus: 'friend' };
@@ -202,7 +201,6 @@ exports.searchUsers = async (req, res) => {
         });
 
         const finalOutput = finalResults.map(({ friends, ...user }) => user);
-
         res.status(200).json(finalOutput);
 
     } catch (err) {

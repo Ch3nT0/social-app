@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const controller = require("../../controllers/client/user.controller");
+const { optionalVerifyToken } = require('../../middlewares/auth.middleware');
 
-router.get('/search', controller.searchUsers);
+router.get('/search', optionalVerifyToken,controller.searchUsers);
 router.get('/:id', controller.getUser);
 router.put('/:id', controller.updateUser);
 router.delete('/:id', controller.deleteUser);

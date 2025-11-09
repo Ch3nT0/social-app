@@ -35,7 +35,7 @@ const SearchFriendsPage = () => {
     useEffect(() => {
         if (initialQuery && !hasFetchedRef.current) {
             performSearch(initialQuery);
-            hasFetchedRef.current = true; // Đánh dấu đã fetch
+            hasFetchedRef.current = true;
         }
     }, [initialQuery]);
 

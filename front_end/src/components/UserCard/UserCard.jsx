@@ -1,8 +1,6 @@
-// src/components/UserCard/UserCard.jsx
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { sendFriendRequest, cancelSentRequest, unfriendUser } from '../../services/client/friendService';
+import { sendFriendRequest, cancelSentRequest, unfriendUser, acceptFriendRequest, rejectFriendRequest } from '../../services/client/friendService';
 import { getCookie } from '../../helpers/cookie';
 
 const getUserId = () => getCookie('userId') || null;
@@ -14,6 +12,11 @@ const UserCard = ({ user, onUpdateStatus }) => {
     
     const isCurrentUser = currentUserId === user._id;
 
+    const updateState = (newStatus) => {
+        setRequestStatus(newStatus);
+        if (onUpdateStatus) onUpdateStatus(user._id, newStatus);
+    };
+
     const handleSendRequest = async () => {
         if (!currentUserId) {
             alert("Vui lòng đăng nhập để gửi lời mời kết bạn.");
@@ -24,8 +27,7 @@ const UserCard = ({ user, onUpdateStatus }) => {
             const result = await sendFriendRequest(user._id); 
             if (result && result.request) {
                 alert(`Đã gửi lời mời kết bạn đến ${user.username}.`);
-                setRequestStatus('pending_sent');
-                if (onUpdateStatus) onUpdateStatus(user._id, 'pending_sent');
+                updateState('pending_sent');
             } else {
                 alert(result.message || "Gửi lời mời thất bại.");
             }
@@ -43,11 +45,39 @@ const UserCard = ({ user, onUpdateStatus }) => {
         try {
             await cancelSentRequest(user._id); 
             alert(`Đã hủy lời mời kết bạn đến ${user.username}.`);
-            setRequestStatus('none'); 
-            if (onUpdateStatus) onUpdateStatus(user._id, 'none');
+            updateState('none'); 
         } catch (error) {
             console.error("Lỗi hủy lời mời:", error);
             alert("Lỗi khi hủy lời mời.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAcceptRequest = async () => {
+        if (!window.confirm(`Bạn có chắc muốn chấp nhận lời mời từ ${user.username} không?`)) return;
+        setLoading(true);
+        try {
+            await acceptFriendRequest(user._id); 
+            alert(`Đã chấp nhận lời mời từ ${user.username}.`);
+            updateState('friend');
+        } catch (error) {
+            console.error("Lỗi chấp nhận lời mời:", error);
+            alert("Lỗi khi chấp nhận lời mời.");
+        } finally {
+            setLoading(false);
+        }
+    };    
+    const handleRejectRequest = async () => {
+        if (!window.confirm(`Bạn có chắc muốn từ chối lời mời từ ${user.username} không?`)) return;
+        setLoading(true);
+        try {
+            await rejectFriendRequest(user._id); 
+            alert(`Đã từ chối lời mời từ ${user.username}.`);
+            updateState('none'); // Trạng thái trở về none
+        } catch (error) {
+            console.error("Lỗi từ chối lời mời:", error);
+            alert("Lỗi khi từ chối lời mời.");
         } finally {
             setLoading(false);
         }
@@ -59,8 +89,7 @@ const UserCard = ({ user, onUpdateStatus }) => {
         try {
             await unfriendUser(user._id); 
             alert(`Đã xóa bạn với ${user.username}.`);
-            setRequestStatus('none');
-            if (onUpdateStatus) onUpdateStatus(user._id, 'none');
+            updateState('none');
         } catch (error) {
             console.error("Lỗi xóa bạn:", error);
             alert("Lỗi khi xóa bạn bè.");
@@ -102,14 +131,16 @@ const UserCard = ({ user, onUpdateStatus }) => {
             return (
                 <div className="flex space-x-2">
                     <button 
+                        onClick={handleAcceptRequest}
                         className="bg-green-600 text-white text-sm px-3 py-1 rounded-full hover:bg-green-700 transition"
-                        // onClick={handleAcceptRequest} // Cần hàm accept
+                        disabled={loading}
                     >
-                        Chấp nhận
+                        {loading ? '...' : 'Chấp nhận'}
                     </button>
                     <button 
+                        onClick={handleRejectRequest}
                         className="bg-red-600 text-white text-sm px-3 py-1 rounded-full hover:bg-red-700 transition"
-                        // onClick={handleRejectRequest} // Cần hàm reject
+                        disabled={loading}
                     >
                         Từ chối
                     </button>

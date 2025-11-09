@@ -53,12 +53,12 @@ exports.sendFriendRequest = async (req, res) => {
 exports.acceptFriendRequest = async (req, res) => {
     const receiverId = getCurrentUserId(req); 
     const requestId = req.params.requestId;
-
     if (!receiverId) { return res.status(401).json({ message: "Yêu cầu xác thực." }); }
 
     try {
-        const request = await FriendRequest.findById(requestId);
-
+        const request = await FriendRequest.findOne({senderId
+:requestId});
+        console.log("Found friend request:", request);
         if (!request) { return res.status(404).json({ message: "Lời mời kết bạn không tồn tại." }); }
 
         if (request.receiverId.toString() !== receiverId) {
@@ -72,7 +72,8 @@ exports.acceptFriendRequest = async (req, res) => {
         const senderId = request.senderId;
 
         await Promise.all([
-            FriendRequest.findByIdAndUpdate(requestId, { status: 'accepted' }),
+            FriendRequest.findOneAndUpdate({senderId
+:requestId}, { status: 'accepted' }),
             User.findByIdAndUpdate(senderId, { $push: { friends: receiverId } }),
             User.findByIdAndUpdate(receiverId, { $push: { friends: senderId } })
         ]);

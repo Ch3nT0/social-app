@@ -28,7 +28,6 @@ const verifyTokenAndAdmin = (req, res, next) => {
     });
 };
 
-
 const verifyTokenAndAuthorization = (req, res, next) => {
     verifyToken(req, res, () => {
         if (req.user.id === req.params.userId || req.user.isAdmin) {
@@ -39,8 +38,26 @@ const verifyTokenAndAuthorization = (req, res, next) => {
     });
 };
 
+const optionalVerifyToken = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        req.user = null;
+        return next(); 
+    }
+    const token = authHeader.split(" ")[1]; 
+    jwt.verify(token, process.env.JWT_SECRET || "social_app_secret_key", (err, user) => {
+        if (err) {
+            req.user = null;
+            return next();
+        }
+        req.user = user; 
+        next(); 
+    });
+};
+
 module.exports = {
     verifyToken,
     verifyTokenAndAdmin,
     verifyTokenAndAuthorization,
+    optionalVerifyToken,
 };

@@ -9,6 +9,7 @@ export const sendFriendRequest = async (receiverId) => {
 };
 
 export const acceptFriendRequest = async (requestId) => {
+    console.log("Accepting friend request with ID:", requestId);
     const path = `${API_FRIENDS_PATH}/accept/${requestId}`;
     return putAuth(path, {}); 
 };
