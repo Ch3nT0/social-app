@@ -1,18 +1,47 @@
 const Post = require('../../models/post.model');
 const User = require('../../models/user.model');
+const Notification = require('../../models/notification.model');
 
-// [POST] /posts
+// [POST] /posts 
 exports.createPost = async (req, res) => {
     const { userId, content, image } = req.body;
-
+    const currentUserId = req.user?.id || userId; 
+    
     try {
         const newPost = new Post({
-            userId,
+            userId: currentUserId,
             content,
             image
         });
 
         const savedPost = await newPost.save();
+        
+        const currentUser = await User.findById(currentUserId);
+        if (currentUser) {
+            const receivers = [...(currentUser.following || []), ...(currentUser.friends || [])];
+
+            if (global.io && global.activeUsers && receivers.length > 0) {
+                const notificationContent = `đã đăng bài viết mới: "${content.substring(0, 30)}..."`;
+                
+                receivers.forEach(async (receiverId) => {
+                    const receiverIdStr = receiverId.toString();
+
+                    const newNotification = new Notification({
+                        senderId: currentUserId,
+                        receiverId: receiverIdStr,
+                        type: 'new_post',
+                        entityId: savedPost._id,
+                        content: notificationContent
+                    });
+                    const savedNotif = await newNotification.save();                    
+                    const receiverSocketId = global.activeUsers.get(receiverIdStr);
+                    if (receiverSocketId) {
+                        global.io.to(receiverSocketId).emit('newNotification', savedNotif);
+                    }
+                });
+            }
+        }
+        
         res.status(201).json({
             message: "Bài đăng đã được tạo thành công.",
             post: savedPost
@@ -80,23 +109,65 @@ exports.deletePost = async (req, res) => {
     }
 };
 
-//[PUT] /posts/:id/like
+// [PUT] /posts/:id/like 
 exports.likePost = async (req, res) => {
     const postId = req.params.id;
-    const  userId  = req.user.userId;
+    const userId = req.user?.userId; 
+    
+    if (!userId) { return res.status(401).json({ message: "Yêu cầu xác thực." }); }
+
     try {
         const post = await Post.findById(postId);
-        if (!post) {
-            return res.status(404).json({ message: "Bài đăng không tồn tại." });
-        }
+        if (!post) { return res.status(404).json({ message: "Bài đăng không tồn tại." }); }
+        
+        const postOwnerId = post.userId.toString();
+        const isCurrentlyLiked = post.likes.includes(userId);
+        let actionMessage;
+        let newCount = post.likes.length;
 
-        if (!post.likes.includes(userId)) {
+        if (!isCurrentlyLiked) {
             await post.updateOne({ $push: { likes: userId } });
-            res.status(200).json({ message: "Bài đăng đã được thích (Like)." });
+            actionMessage = "Bài đăng đã được thích (Like).";
+            newCount++;
+
+            if (userId !== postOwnerId) { 
+                const newNotification = new Notification({
+                    senderId: userId,
+                    receiverId: postOwnerId,
+                    type: 'like',
+                    entityId: post._id,
+                    content: `đã thích bài viết của bạn.`
+                });
+                const savedNotif = await newNotification.save();
+                
+                const receiverSocketId = global.activeUsers.get(postOwnerId);
+                if (global.io && receiverSocketId) {
+                    global.io.to(receiverSocketId).emit('newNotification', savedNotif);
+                }
+            }
+            
         } else {
             await post.updateOne({ $pull: { likes: userId } });
-            res.status(200).json({ message: "Đã bỏ thích (Unlike) bài đăng." });
+            actionMessage = "Đã bỏ thích (Unlike) bài đăng.";
+            newCount--;
+            await Notification.deleteOne({ 
+                senderId: userId, 
+                receiverId: postOwnerId,
+                type: 'like',
+                entityId: post._id
+            });
+        }        
+        if (global.io) {
+            global.io.emit('postLiked', {
+                postId: postId,
+                userId: userId,
+                isLiked: !isCurrentlyLiked,
+                newCount: newCount
+            });
         }
+        
+        res.status(200).json({ message: actionMessage });
+        
     } catch (err) {
         console.error("Lỗi khi thích/bỏ thích bài đăng:", err);
         res.status(500).json({ message: "Lỗi Server nội bộ.", error: err.message });
