@@ -28,24 +28,30 @@ global.activeUsers = new Map();
 
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
-    
+
     socket.on('addUser', (userId) => {
-        // Thêm/cập nhật user vào map (userId -> socketId)
         global.activeUsers.set(userId, socket.id);
         console.log(`User ${userId} joined, active users: ${global.activeUsers.size}`);
     });
 
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);
-        // Xóa user khỏi map khi ngắt kết nối
         global.activeUsers.forEach((value, key) => {
             if (value === socket.id) {
                 global.activeUsers.delete(key);
             }
         });
     });
+
+    socket.on('joinPostRoom', (postId) => {
+        socket.join(postId); 
+        console.log(`Socket ${socket.id} joined room: ${postId}`);
+    });
+    socket.on('leavePostRoom', (postId) => {
+        socket.leave(postId);
+        console.log(`Socket ${socket.id} left room: ${postId}`);
+    });
 });
-// ---------------------------------------------
 
 
 routeApiClient(app);
