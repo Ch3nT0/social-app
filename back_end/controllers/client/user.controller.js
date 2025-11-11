@@ -66,19 +66,17 @@ exports.getUser = async (req, res) => {
 
 // [GET] /users/friends/:userId - Lấy danh sách bạn bè
 exports.getFriends = async (req, res) => {
+    console.log("Fetching friends for userId:", req.params.userId);
     try {
         const user = await User.findById(req.params.userId);
-
         if (!user) {
             return res.status(404).json({ message: "Người dùng không tồn tại." });
         }
-
         const friends = await Promise.all(
             user.friends.map((friendId) => {
                 return User.findById(friendId).select('username profilePicture');
             })
         );
-
         res.status(200).json(friends);
     } catch (err) {
         console.error("Lỗi khi lấy danh sách bạn bè:", err);
@@ -209,3 +207,50 @@ exports.searchUsers = async (req, res) => {
     }
 };
 
+// [GET] /api/users/suggestions - Lấy danh sách gợi ý người dùng
+exports.getSuggestedUsers = async (req, res) => {
+    const currentUserId = req.user?.id || req.query.userId;
+    if (!currentUserId) {
+        return res.status(401).json({ message: "Yêu cầu xác thực." });
+    }
+    try {
+        const currentUser = await User.findById(currentUserId).select('friends');
+        if (!currentUser) {
+            return res.status(404).json({ message: "Người dùng không tồn tại." });
+        }
+
+        const friendsIds = currentUser.friends || [];
+        const excludedIds = [currentUserId, ...friendsIds];
+        const pendingRequests = await FriendRequest.find({
+            status: 'pending',
+            $or: [
+                { senderId: currentUserId }, // Mình gửi cho họ
+                { receiverId: currentUserId } // Họ gửi cho mình
+            ]
+        }).select('senderId receiverId');
+        pendingRequests.forEach(req => {
+            if (!excludedIds.includes(req.senderId.toString())) {
+                excludedIds.push(req.senderId.toString());
+            }
+            if (!excludedIds.includes(req.receiverId.toString())) {
+                excludedIds.push(req.receiverId.toString());
+            }
+        });
+
+        const suggestedUsers = await User.find({
+            _id: { $nin: excludedIds }
+        })
+            .select('_id username profilePicture city desc')
+            .limit(10);
+        const finalSuggestions = suggestedUsers.map(user => ({
+            ...user.toObject(),
+            friendshipStatus: 'none'
+        }));
+
+        res.status(200).json(finalSuggestions);
+
+    } catch (err) {
+        console.error("Lỗi khi lấy gợi ý:", err);
+        res.status(500).json({ message: "Lỗi Server nội bộ.", error: err.message });
+    }
+};

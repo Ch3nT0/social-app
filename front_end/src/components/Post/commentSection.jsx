@@ -178,9 +178,7 @@ const CommentSection = ({ postId, postOwnerId, onCommentCountChange }) => {
         }
     }, [socket, postId, onCommentCountChange]); 
 
-    // ------------------- LOGIC SUBMIT -------------------
 
-    // Xử lý gửi bình luận CHUNG (gốc hoặc trả lời)
     const handleNewCommentSubmit = async (parentId, text) => {
         setSubmitting(true);
         const commentData = {

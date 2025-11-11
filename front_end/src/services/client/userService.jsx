@@ -23,3 +23,22 @@ export const searchUsersByKeyword = async (keyword) => {
     return getAuth(path);
 };
 
+export const getFriendsList = async (userId) => {
+    console.log("Fetching friends list for userId:", userId);
+    const path = `${API_USERS_PATH}/friends/${userId}`;
+    const result = await getAuth(path);
+    console.log("Friends list result:", result);
+    return result;
+};
+
+
+export const getSuggestedUsers = async (userId) => {
+    const path = `${API_USERS_PATH}/suggestions`; 
+    try {
+        const result = await getAuth(path);
+        return result; 
+    } catch (error) {
+        console.error("Error fetching suggestions:", error);
+        return [];
+    }
+};

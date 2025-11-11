@@ -27,29 +27,30 @@ global.io = io;
 global.activeUsers = new Map(); 
 
 io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`);
-
+    const emitOnlineUsers = () => {
+        const onlineUserIds = Array.from(global.activeUsers.keys());
+        io.emit('getOnlineUsers', onlineUserIds);
+    };
     socket.on('addUser', (userId) => {
         global.activeUsers.set(userId, socket.id);
-        console.log(`User ${userId} joined, active users: ${global.activeUsers.size}`);
+        emitOnlineUsers(); 
     });
-
     socket.on('disconnect', () => {
-        console.log(`User disconnected: ${socket.id}`);
         global.activeUsers.forEach((value, key) => {
             if (value === socket.id) {
                 global.activeUsers.delete(key);
             }
         });
+        emitOnlineUsers(); 
     });
-
     socket.on('joinPostRoom', (postId) => {
         socket.join(postId); 
-        console.log(`Socket ${socket.id} joined room: ${postId}`);
     });
     socket.on('leavePostRoom', (postId) => {
         socket.leave(postId);
-        console.log(`Socket ${socket.id} left room: ${postId}`);
+    });
+    socket.on('requestOnlineUsers', () => {
+        emitOnlineUsers();
     });
 });
 

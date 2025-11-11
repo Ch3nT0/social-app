@@ -1,15 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const controller = require("../../controllers/client/user.controller");
-const { optionalVerifyToken } = require('../../middlewares/auth.middleware');
+const { optionalVerifyToken, verifyToken } = require('../../middlewares/auth.middleware');
 
+router.get('/suggestions',verifyToken, controller.getSuggestedUsers);
+router.get('/friends/:userId',verifyToken, controller.getFriends);
 router.get('/search', optionalVerifyToken,controller.searchUsers);
 router.get('/:id', controller.getUser);
-router.put('/:id', controller.updateUser);
-router.delete('/:id', controller.deleteUser);
-router.put('/:id/follow', controller.followUser);
-router.put('/:id/unfollow', controller.unfollowUser);
-router.get('/:id/friends/:userId', controller.getFriends);
+router.put('/:id',verifyToken, controller.updateUser);
+router.delete('/:id',verifyToken, controller.deleteUser);
+router.put('/:id/follow',verifyToken, controller.followUser);
+router.put('/:id/unfollow',verifyToken, controller.unfollowUser);
 
 
 module.exports = router;
