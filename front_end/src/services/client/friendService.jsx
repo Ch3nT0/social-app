@@ -3,7 +3,6 @@ import { getAuth, postAuth, putAuth, delAuth } from "../../utils/request";
 const API_FRIENDS_PATH = "/friends";
 
 export const sendFriendRequest = async (receiverId) => {
-    console.log("Sending friend request to:", receiverId);
     const path = `${API_FRIENDS_PATH}/add/${receiverId}`;
     return postAuth(path, {}); 
 };

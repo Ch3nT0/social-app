@@ -1,4 +1,5 @@
 const FriendRequest = require('../../models/friendRequest.model');
+const notificationModel = require('../../models/notification.model');
 const User = require('../../models/user.model');
 
 const getCurrentUserId = (req) => req.user?.userId || req.body.userId;
@@ -26,7 +27,6 @@ exports.sendFriendRequest = async (req, res) => {
                 { senderId: receiverId, receiverId: senderId, status: 'pending' }
             ]
         });
-
         if (existingRequest) {
             if (existingRequest.senderId.toString() === receiverId) {
                 return res.status(400).json({ message: "Người dùng này đã gửi lời mời kết bạn cho bạn. Vui lòng chấp nhận." });
@@ -39,7 +39,7 @@ exports.sendFriendRequest = async (req, res) => {
             status: 'pending'
         });
         const savedRequest = await newRequest.save();
-        const newNotification = new Notification({
+        const newNotification = new notificationModel({
             senderId: senderId,
             receiverId: receiverId,
             type: 'friend_request',
@@ -47,7 +47,6 @@ exports.sendFriendRequest = async (req, res) => {
             content: `đã gửi cho bạn lời mời kết bạn.`
         });
         const savedNotif = await newNotification.save();
-
         const receiverSocketId = global.activeUsers.get(receiverId);
         if (global.io && receiverSocketId) {
             global.io.to(receiverSocketId).emit('newNotification', savedNotif);
@@ -64,51 +63,40 @@ exports.sendFriendRequest = async (req, res) => {
 
 // [PUT] /friends/accept/:requestId
 exports.acceptFriendRequest = async (req, res) => {
-    const receiverId = getCurrentUserId(req);
+    const receiverId = getCurrentUserId(req); 
     const requestId = req.params.requestId;
     if (!receiverId) { return res.status(401).json({ message: "Yêu cầu xác thực." }); }
 
     try {
-        const request = await FriendRequest.findOne({
-            senderId
-                : requestId
-        });
-        console.log("Found friend request:", request);
-        if (!request) { return res.status(404).json({ message: "Lời mời kết bạn không tồn tại." }); }
+        const request = await FriendRequest.findOne({ _id: requestId, status: 'pending' });
+
+        if (!request) { 
+            return res.status(404).json({ message: "Lời mời kết bạn không tồn tại hoặc đã được xử lý." }); 
+        }
 
         if (request.receiverId.toString() !== receiverId) {
             return res.status(403).json({ message: "Bạn không phải là người nhận của lời mời này." });
         }
-
-        if (request.status !== 'pending') {
-            return res.status(400).json({ message: `Lời mời đã ở trạng thái ${request.status}.` });
-        }
-
+        
         const senderId = request.senderId;
 
         await Promise.all([
-            FriendRequest.findOneAndUpdate({
-                senderId
-                    : requestId
-            }, { status: 'accepted' }),
+            FriendRequest.findByIdAndDelete(requestId),             
             User.findByIdAndUpdate(senderId, { $push: { friends: receiverId } }),
             User.findByIdAndUpdate(receiverId, { $push: { friends: senderId } })
-        ]);
-
+        ]);        
         const newNotification = new Notification({
             senderId: receiverId,
-            receiverId: senderId, // Người nhận là người gửi lời mời ban đầu
+            receiverId: senderId, 
             type: 'friend_accept',
-            entityId: receiverId, // ID của người chấp nhận
+            entityId: receiverId, 
             content: `đã chấp nhận lời mời kết bạn của bạn.`
         });
         const savedNotif = await newNotification.save();
-
         const senderSocketId = global.activeUsers.get(senderId.toString());
         if (global.io && senderSocketId) {
             global.io.to(senderSocketId).emit('newNotification', savedNotif);
         }
-        
         res.status(200).json({ message: "Đã chấp nhận lời mời kết bạn. Hai bạn đã là bạn bè!" });
     } catch (err) {
         console.error("Lỗi khi chấp nhận lời mời:", err);
@@ -120,24 +108,17 @@ exports.acceptFriendRequest = async (req, res) => {
 exports.rejectFriendRequest = async (req, res) => {
     const receiverId = getCurrentUserId(req);
     const requestId = req.params.requestId;
-
     if (!receiverId) { return res.status(401).json({ message: "Yêu cầu xác thực." }); }
-
     try {
         const request = await FriendRequest.findById(requestId);
-
         if (!request) { return res.status(404).json({ message: "Lời mời kết bạn không tồn tại." }); }
-
         if (request.receiverId.toString() !== receiverId) {
             return res.status(403).json({ message: "Bạn không có quyền từ chối lời mời này." });
         }
-
         if (request.status !== 'pending') {
             return res.status(400).json({ message: `Lời mời đã ở trạng thái ${request.status}.` });
         }
-
-        await FriendRequest.findByIdAndUpdate(requestId, { status: 'rejected' });
-
+        await FriendRequest.findByIdAndDelete(requestId);
         res.status(200).json({ message: "Đã từ chối lời mời kết bạn." });
     } catch (err) {
         console.error("Lỗi khi từ chối lời mời:", err);

@@ -2,11 +2,12 @@ const Notification = require('../models/notification.model');
 
 // [GET] /notifications - Lấy danh sách thông báo
 exports.getNotifications = async (req, res) => {
-    const userId = req.user?.id;
+    console.log('Hi')
+    const userId = req.user?.userId;
     try {
         const notifications = await Notification.find({ receiverId: userId })
             .populate('senderId', 'username profilePicture')
-            .sort({ createdAt: -1 }) // Sắp xếp mới nhất lên trước
+            .sort({ createdAt: -1 }) 
             .limit(20);
 
         res.status(200).json(notifications);
@@ -17,7 +18,7 @@ exports.getNotifications = async (req, res) => {
 
 // [PUT] /notifications/read - Đánh dấu đã đọc
 exports.markAsRead = async (req, res) => {
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
     const { notificationId } = req.body;
     try {
         if (notificationId) {

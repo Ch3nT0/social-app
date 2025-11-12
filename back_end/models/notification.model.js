@@ -11,7 +11,6 @@ const NotificationSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
-    // Loại hành động: 'like', 'comment', 'friend_request', 'friend_accept'
     type: {
         type: String,
         enum: ['like', 'comment', 'friend_request', 'friend_accept', 'new_post'],
