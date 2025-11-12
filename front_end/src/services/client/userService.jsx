@@ -31,14 +31,8 @@ export const getFriendsList = async (userId) => {
     return result;
 };
 
-
 export const getSuggestedUsers = async (userId) => {
-    const path = `${API_USERS_PATH}/suggestions`; 
-    try {
-        const result = await getAuth(path);
-        return result; 
-    } catch (error) {
-        console.error("Error fetching suggestions:", error);
-        return [];
-    }
+    const path = `${API_USERS_PATH}/suggestions`;
+    const result = await getAuth(path);
+    return result;
 };

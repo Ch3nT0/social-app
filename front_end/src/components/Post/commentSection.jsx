@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getPostComments, createNewComment, deleteCommentById } from '../../services/client/commentService';
 import { getCookie } from '../../helpers/cookie';
-import { useSocket } from '../../context/SocketContext'; 
+import { useSocket } from '../../context/SocketContext';
 
 const getUserId = () => getCookie('userId') || null;
 
-const CommentItem = ({ 
-    comment, 
-    postOwnerId, 
-    currentUserId, 
-    onReplySubmit, 
+const CommentItem = ({
+    comment,
+    postOwnerId,
+    currentUserId,
+    onReplySubmit,
     onDeleteComment,
-    level = 0 
+    level = 0
 }) => {
     const [isReplying, setIsReplying] = useState(false);
     const [replyText, setReplyText] = useState('');
@@ -22,15 +22,15 @@ const CommentItem = ({
         if (!replyText.trim() || submittingReply) return;
 
         setSubmittingReply(true);
-        await onReplySubmit(comment._id, replyText.trim()); 
+        await onReplySubmit(comment._id, replyText.trim());
         setReplyText('');
-        setIsReplying(false); 
+        setIsReplying(false);
         setSubmittingReply(false);
     };
 
     const canDelete = comment.userId?._id === currentUserId || postOwnerId === currentUserId;
 
-    const paddingLeft = `${Math.min(level, 4) * 16}px`; 
+    const paddingLeft = `${Math.min(level, 4) * 16}px`;
 
     return (
         <div style={{ paddingLeft }} className={`pb-2 ${level > 0 ? 'border-l border-gray-200 pl-4' : ''}`}>
@@ -70,9 +70,9 @@ const CommentItem = ({
             {comment.replies && comment.replies.length > 0 && (
                 <div className="mt-2 space-y-2">
                     {comment.replies.map(reply => (
-                        <CommentItem 
-                            key={reply._id} 
-                            comment={reply} 
+                        <CommentItem
+                            key={reply._id}
+                            comment={reply}
                             postOwnerId={postOwnerId}
                             currentUserId={currentUserId}
                             onReplySubmit={onReplySubmit}
@@ -86,26 +86,27 @@ const CommentItem = ({
     );
 };
 
+
 const CommentSection = ({ postId, postOwnerId, onCommentCountChange }) => {
-    const [comments, setComments] = useState([]); 
+    const [comments, setComments] = useState([]);
     const [newCommentText, setNewCommentText] = useState('');
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const currentUserId = getUserId();
-    
-    const { socket } = useSocket(); 
 
-    // Hàm đệ quy để chèn bình luận mới vào đúng vị trí (gốc hoặc replies)
+    const { socket } = useSocket();
+
     const updateCommentsState = (prevComments, newComment, parentId) => {
         if (!parentId) {
-            return [...prevComments, newComment];
+            return [newComment, ...prevComments];
         }
+
         const insertReply = (items) => {
             return items.map(item => {
                 if (item._id === parentId) {
                     return {
                         ...item,
-                        replies: [...(item.replies || []), newComment] 
+                        replies: [newComment, ...(item.replies || [])]
                     };
                 }
                 if (item.replies) {
@@ -119,12 +120,21 @@ const CommentSection = ({ postId, postOwnerId, onCommentCountChange }) => {
         };
         return insertReply(prevComments);
     };
-    
-    
+
+    // ⭐️ HÀM MỚI: KIỂM TRA SỰ TỒN TẠI CỦA COMMENT TRONG CẤU TRÚC DẠNG CÂY
+    const existsDeep = useCallback((items, id) => {
+        for (const item of items) {
+            if (item._id === id) return true;
+            if (item.replies && existsDeep(item.replies, id)) return true;
+        }
+        return false;
+    }, []);
+
+
     const fetchComments = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await getPostComments(postId); 
+            const data = await getPostComments(postId);
             if (Array.isArray(data)) {
                 setComments(data);
             }
@@ -138,36 +148,34 @@ const CommentSection = ({ postId, postOwnerId, onCommentCountChange }) => {
     useEffect(() => {
         fetchComments();
     }, [fetchComments]);
-    
-    // EFFECT SOCKET.IO: Tham gia phòng và lắng nghe sự kiện
+
+    // EFFECT SOCKET.IO: Tham gia phòng và lắng nghe sự kiện Real-time
     useEffect(() => {
         if (socket && postId) {
-            console.log("Tham gia phòng bình luận cho bài viết:", postId);
-            socket.emit('joinPostRoom', postId); 
+            socket.emit('joinPostRoom', postId);
 
             const handleNewComment = (newComment) => {
-                console.log("Nhận bình luận mới qua socket:", newComment);
-                if (newComment.postId === postId) { 
-                    
+                if (newComment.postId === postId) {
+
                     setComments(prev => {
-                        const exists = prev.some(c => c._id === newComment._id);
-                        if (!exists) {
-                            const parentId = newComment.parentId; 
-                            return updateCommentsState(prev, newComment, parentId);
-                         }
-                        return prev;
+                        if (existsDeep(prev, newComment._id)) {
+                            return prev;
+                        }
+
+                        const parentId = newComment.parentId;
+                        return updateCommentsState(prev, newComment, parentId);
                     });
                 }
             };
-            
+
             const handleCountUpdate = (data) => {
-                 if (data.postId === postId && data.change) {
-                    onCommentCountChange(data.change); 
+                if (data.postId === postId && data.change) {
+                    onCommentCountChange(data.change);
                 }
             };
 
             socket.on('newComment', handleNewComment);
-            socket.on('updateCommentCount', handleCountUpdate); 
+            socket.on('updateCommentCount', handleCountUpdate);
 
             // Cleanup: Rời phòng khi component unmount
             return () => {
@@ -176,8 +184,9 @@ const CommentSection = ({ postId, postOwnerId, onCommentCountChange }) => {
                 socket.off('updateCommentCount', handleCountUpdate);
             };
         }
-    }, [socket, postId, onCommentCountChange]); 
+    }, [socket, postId, onCommentCountChange, existsDeep]); // Thêm existsDeep vào dependency
 
+    // ------------------- LOGIC SUBMIT -------------------
 
     const handleNewCommentSubmit = async (parentId, text) => {
         setSubmitting(true);
@@ -185,14 +194,13 @@ const CommentSection = ({ postId, postOwnerId, onCommentCountChange }) => {
             userId: currentUserId,
             postId: postId,
             text: text,
-            parentId: parentId || undefined 
+            parentId: parentId || undefined
         };
 
         try {
             const result = await createNewComment(commentData);
             if (result && result.comment) {
-                // Optimistic Update: Thêm vào state ngay lập tức
-                setComments(prev => updateCommentsState(prev, result.comment, parentId));
+                // setComments(prev => updateCommentsState(prev, result.comment, parentId));
             } else {
                 alert(result.message || "Không thể bình luận.");
             }
@@ -202,8 +210,7 @@ const CommentSection = ({ postId, postOwnerId, onCommentCountChange }) => {
             setSubmitting(false);
         }
     };
-    
-    // Xử lý gửi bình luận GỐC
+
     const handleRootCommentSubmit = async (e) => {
         e.preventDefault();
         if (!newCommentText.trim() || !currentUserId) return;
@@ -211,32 +218,33 @@ const CommentSection = ({ postId, postOwnerId, onCommentCountChange }) => {
         await handleNewCommentSubmit(null, newCommentText.trim());
         setNewCommentText('');
     };
-    
-    // Xử lý XÓA
+
     const handleDelete = async (commentId) => {
         if (!window.confirm("Bạn có chắc muốn xóa bình luận này?")) return;
-        
+
         try {
             const result = await deleteCommentById(commentId);
-            
+
             if (result && result.message) {
-                await fetchComments(); 
-                
-                const deletedCount = result.deletedCount || 1; 
-                onCommentCountChange(-deletedCount); 
+                // Tối ưu: Nếu thành công, fetch lại toàn bộ danh sách để đảm bảo xóa sạch đệ quy
+                await fetchComments();
+
+                const deletedCount = result.deletedCount || 1;
+                onCommentCountChange(-deletedCount);
             } else {
-                 alert(result.message || "Xóa thất bại.");
+                alert(result.message || "Xóa thất bại.");
             }
         } catch (error) {
-             alert("Lỗi khi xóa bình luận.");
+            alert("Lỗi khi xóa bình luận.");
         }
     };
-    
+
+    // ------------------- RENDER -------------------
 
     return (
         <div className="mt-4 border-t pt-4">
             <h4 className="font-semibold mb-3">Bình luận</h4>
-            
+
             {currentUserId && (
                 <form onSubmit={handleRootCommentSubmit} className="flex space-x-2 mb-6">
                     <input
@@ -258,19 +266,19 @@ const CommentSection = ({ postId, postOwnerId, onCommentCountChange }) => {
             )}
 
             {loading && <p className="text-center text-sm text-gray-500">Đang tải bình luận...</p>}
-            
+
             <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                 {comments.length === 0 && !loading && (
                     <p className="text-center text-gray-500">Chưa có bình luận nào.</p>
                 )}
-                
+
                 {comments.map((comment) => (
-                    <CommentItem 
-                        key={comment._id} 
-                        comment={comment} 
+                    <CommentItem
+                        key={comment._id}
+                        comment={comment}
                         postOwnerId={postOwnerId}
                         currentUserId={currentUserId}
-                        onReplySubmit={handleNewCommentSubmit} 
+                        onReplySubmit={handleNewCommentSubmit}
                         onDeleteComment={handleDelete}
                     />
                 ))}

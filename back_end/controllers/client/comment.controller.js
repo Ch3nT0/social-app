@@ -95,7 +95,7 @@ exports.getCommentsByPost = async (req, res) => {
     try {
         const allComments = await Comment.find({ postId: postId })
             .populate('userId', 'username profilePicture') 
-            .sort({ createdAt: 1 }); // Sắp xếp theo thời gian tạo
+            .sort({ createdAt: -1 }); 
 
         const buildCommentTree = (comments) => {
             const commentMap = {};

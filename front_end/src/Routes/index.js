@@ -5,6 +5,7 @@ import Profile from "../pages/client/profile";
 import Login from "../pages/client/Login";
 import Register from "../pages/client/register";
 import SearchFriendsPage from "../pages/client/SearchFriendsPage";
+import FriendsPage from "../pages/client/FriendsPage/FriendsPage";
 
 
 const URL_ADMIN = '/admin'
@@ -12,26 +13,29 @@ const URL_ADMIN = '/admin'
 export const routes = [
     {
         path: '/',
-        element: <LayoutDefault />, 
+        element: <LayoutDefault />,
         children: [
             {
-                path: '/', 
+                path: '/',
                 element: <Home />
-            }, 
+            },
             {
                 path: '/profile/:id',
                 element: <Profile />
             },
             {
-                path: '/search/friends', 
+                path: '/search/friends',
                 element: <SearchFriendsPage />
+            }, {
+                path: '/friends',
+                element: <FriendsPage />
             }
         ]
-    }, 
+    },
     {
         path: '/login',
         element: <Login />
-    }, 
+    },
     {
         path: '/register',
         element: <Register />
