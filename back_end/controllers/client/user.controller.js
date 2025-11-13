@@ -150,9 +150,11 @@ exports.unfollowUser = async (req, res) => {
 exports.searchUsers = async (req, res) => {
     const keyword = req.query.q;
     const currentUserId = req.user?.userId;
+
     if (!keyword || keyword.length < 2) {
         return res.status(200).json([]);
     }
+    
     try {
         const regex = new RegExp(keyword, 'i');
         let searchResults = await User.find({
@@ -165,6 +167,7 @@ exports.searchUsers = async (req, res) => {
             .select('_id username profilePicture city friends')
             .limit(20)
             .lean();
+
         if (!currentUserId || searchResults.length === 0) {
             return res.status(200).json(searchResults.map(user => ({ ...user, friendshipStatus: 'none' })));
         }
@@ -178,26 +181,39 @@ exports.searchUsers = async (req, res) => {
                 { senderId: { $in: resultUserIds }, receiverId: currentUserId }
             ]
         });
+
         const finalResults = searchResults.map(user => {
+            // 1. Kiểm tra bạn bè
             if (user.friends.includes(currentUserId)) {
                 return { ...user, friendshipStatus: 'friend' };
             }
 
+            // 2. Kiểm tra lời mời đang chờ
             const pendingReq = pendingRequests.find(req =>
                 req.senderId.toString() === user._id.toString() || req.receiverId.toString() === user._id.toString()
             );
 
             if (pendingReq) {
+                // ⭐️ THÊM REQUEST ID VÀO baseResult
+                const baseResult = { 
+                    ...user, 
+                    requestId: pendingReq._id.toString() 
+                }; 
+                
                 if (pendingReq.senderId.toString() === currentUserId) {
-                    return { ...user, friendshipStatus: 'pending_sent' };
+                    // Mình đã gửi -> Dùng requestId để Hủy lời mời
+                    return { ...baseResult, friendshipStatus: 'pending_sent' };
                 } else {
-                    return { ...user, friendshipStatus: 'pending_received' };
+                    // Họ đã gửi cho mình -> Dùng requestId để Chấp nhận/Từ chối
+                    return { ...baseResult, friendshipStatus: 'pending_received' };
                 }
             }
 
+            // Mặc định
             return { ...user, friendshipStatus: 'none' };
         });
 
+        // Loại bỏ trường 'friends' khỏi output cuối cùng
         const finalOutput = finalResults.map(({ friends, ...user }) => user);
         res.status(200).json(finalOutput);
 

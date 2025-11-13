@@ -1,8 +1,7 @@
-const Notification = require('../models/notification.model');
+const Notification = require('../../models/notification.model');
 
 // [GET] /notifications - Lấy danh sách thông báo
 exports.getNotifications = async (req, res) => {
-    console.log('Hi')
     const userId = req.user?.userId;
     try {
         const notifications = await Notification.find({ receiverId: userId })

@@ -20,7 +20,8 @@ export const unfollowUser = async (userIdToUnfollow) => {
 
 export const searchUsersByKeyword = async (keyword) => {
     const path = `${API_USERS_PATH}/search?q=${encodeURIComponent(keyword)}`;
-    return getAuth(path);
+    const result= getAuth(path);
+    return result;
 };
 
 export const getFriendsList = async (userId) => {

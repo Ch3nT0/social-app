@@ -21,7 +21,6 @@ const SidebarRight = () => {
         }
         try {
             const friendsResponse = await getFriendsList(currentUserId);
-            console.log("Fetched friends data:", friendsResponse);
             const suggestedData = await getSuggestedUsers(currentUserId);
             let friendsArray = [];
             if (Array.isArray(friendsResponse)) {
@@ -32,7 +31,6 @@ const SidebarRight = () => {
                 friendsArray = friendsResponse.data;
             }
             setFriends(friendsArray);
-            console.log(suggestedData);
             setSuggestions(suggestedData || []);
         } catch (error) {
             console.error("Lỗi tải SidebarRight:", error);
@@ -58,8 +56,7 @@ const SidebarRight = () => {
 
     // Lọc danh sách bạn bè đang online
     const onlineFriends = friends.filter(friend => onlineUsers.includes(friend._id));
-    console.log("Online friends:", onlineFriends);
-    const offlineFriends = friends.filter(friend => !onlineUsers.includes(friend._id));
+    // const offlineFriends = friends.filter(friend => !onlineUsers.includes(friend._id));
 
     if (loading) {
         return <div className="p-4 text-center text-sm">Đang tải sidebar...</div>;

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getCookie, deleteCookie } from '../../helpers/cookie';
 import { getUserProfile } from '../../services/client/userService';
 import { useSocket } from '../../context/SocketContext';
-import { markNotificationsAsRead } from '../../services/client/notificationService'; 
+import { getNotifications, markNotificationsAsRead } from '../../services/client/notificationService';
 
 const getUserId = () => {
     return getCookie('userId') || null;
@@ -12,26 +12,22 @@ const getUserId = () => {
 const Navbar = () => {
     const navigate = useNavigate();
     // Lấy state và setter từ SocketContext
-    const { socket, notifications, setNotifications } = useSocket(); 
-    
+    const { socket, notifications, setNotifications } = useSocket();
+
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
-    const [searchTerm, setSearchTerm] = useState(''); 
+    const [searchTerm, setSearchTerm] = useState('');
 
     const currentUserId = getUserId();
     const menuRef = useRef(null);
     const notifRef = useRef(null);
-    
-    const FALLBACK_AVATAR = "https://via.placeholder.com/150/CCCCCC/FFFFFF?text=P";
-    
-    // Tính toán số lượng thông báo chưa đọc
-    const unreadCount = notifications.filter(n => !n.isRead).length; 
 
-    // --------------------------------------------------
-    // EFFECTS & HELPERS
-    // --------------------------------------------------
+    const FALLBACK_AVATAR = "https://via.placeholder.com/150/CCCCCC/FFFFFF?text=P";
+
+    // Tính toán số lượng thông báo chưa đọc
+    const unreadCount = notifications.filter(n => !n.isRead).length;
 
     useEffect(() => {
         const token = getCookie('token');
@@ -50,7 +46,7 @@ const Navbar = () => {
                     } else {
                         handleLogout(false);
                     }
-                    
+
                     // 2. Tải Lịch sử Thông báo (Giả định hàm này tồn tại trong notificationService)
                     // const notifHistory = await getNotifications();
                     // if (Array.isArray(notifHistory)) {
@@ -63,7 +59,7 @@ const Navbar = () => {
             fetchInitialData();
         } else {
             setCurrentUser(null);
-            setNotifications([]); 
+            setNotifications([]);
         }
     }, [isAuthenticated, currentUserId]);
 
@@ -74,7 +70,7 @@ const Navbar = () => {
                 setIsMenuOpen(false);
             }
             if (notifRef.current && !notifRef.current.contains(event.target)) {
-                 setIsNotifOpen(false);
+                setIsNotifOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -95,21 +91,37 @@ const Navbar = () => {
 
     const toggleMenu = () => {
         setIsMenuOpen(prev => !prev);
-        setIsNotifOpen(false); 
+        setIsNotifOpen(false);
     };
-    
+
     // Hàm mở/đóng Notification và ĐÁNH DẤU ĐÃ ĐỌC
     const toggleNotifications = async () => {
-        const currentlyOpen = isNotifOpen;
-        setIsNotifOpen(prev => !prev);
-        setIsMenuOpen(false); 
+        const wasOpen = isNotifOpen;
 
-        if (!currentlyOpen && notifications.some(n => !n.isRead)) {
-        await markNotificationsAsRead(); 
-        setNotifications(prev => prev.map(n => 
-            !n.isRead ? { ...n, isRead: true } : n
-        ));
-    }
+        // 1. Logic xảy ra KHI ĐÓNG (từ true -> false)
+        if (wasOpen && notifications.some(n => !n.isRead)) {
+            try {
+                await markNotificationsAsRead();
+                setNotifications(prev => prev.map(n =>
+                    !n.isRead ? { ...n, isRead: true } : n
+                ));
+            } catch (error) {
+                console.error("Lỗi khi đánh dấu đã đọc:", error);
+            }
+        }
+        setIsNotifOpen(prev => !prev);
+        setIsMenuOpen(false);
+        if (!wasOpen) { 
+            try {
+                const notifHistory = await getNotifications();
+                console.log(notifHistory);
+                if (Array.isArray(notifHistory)) {
+                    setNotifications(notifHistory);
+                }
+            } catch (error) {
+                console.error("Lỗi tải lịch sử thông báo:", error);
+            }
+        }
     };
 
     const handleSearchSubmit = (e) => {
@@ -117,7 +129,7 @@ const Navbar = () => {
         const trimmedKeyword = searchTerm.trim();
         if (trimmedKeyword) {
             navigate(`/search/friends?q=${encodeURIComponent(trimmedKeyword)}`);
-            setSearchTerm(''); 
+            setSearchTerm('');
         }
     };
 
@@ -157,7 +169,7 @@ const Navbar = () => {
                         <div className="flex space-x-3">
                             <Link to="/" className="p-2 rounded-full hover:bg-gray-100 text-gray-600 relative">🏠</Link>
                             <button className="p-2 rounded-full hover:bg-gray-100 text-gray-600 relative">💬</button>
-                            
+
                             {/* DROPDOWN THÔNG BÁO */}
                             <div className="relative" ref={notifRef}>
                                 <button onClick={toggleNotifications} className="p-2 rounded-full hover:bg-gray-100 text-gray-600 relative">
@@ -168,7 +180,7 @@ const Navbar = () => {
                                         </span>
                                     )}
                                 </button>
-                                
+
                                 {isNotifOpen && (
                                     <div className="absolute right-0 top-full mt-3 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl transition duration-200 z-50">
                                         <div className="p-3 font-bold border-b">Thông báo mới</div>
@@ -177,13 +189,13 @@ const Navbar = () => {
                                         ) : (
                                             notifications.map((notif, index) => (
                                                 <div key={notif._id || index} className={`px-3 py-2 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer 
-                                                                ${notif.isRead 
-                                                                    ? 'bg-white opacity-70' 
-                                                                    : 'bg-blue-50/70 font-semibold' 
-                                                                }`}
+                                                                ${notif.isRead
+                                                        ? 'bg-white opacity-70'
+                                                        : 'bg-blue-50/70 font-semibold'
+                                                    }`}
                                                 >
                                                     <p className={`text-xs text-gray-800 ${notif.isRead ? 'text-gray-500' : 'text-gray-800'}`}>
-                                                        <span className="font-semibold text-blue-600 mr-1">{notif.senderId?.username || 'System'}</span> 
+                                                        <span className="font-semibold text-blue-600 mr-1">{notif.senderId?.username || 'System'}</span>
                                                         {notif.content}
                                                     </p>
                                                     <p className="text-xs text-gray-400 mt-0.5">{new Date(notif.createdAt).toLocaleTimeString()}</p>

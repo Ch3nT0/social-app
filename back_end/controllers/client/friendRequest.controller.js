@@ -63,33 +63,33 @@ exports.sendFriendRequest = async (req, res) => {
 
 // [PUT] /friends/accept/:requestId
 exports.acceptFriendRequest = async (req, res) => {
-    const receiverId = getCurrentUserId(req); 
+    const receiverId = getCurrentUserId(req);
     const requestId = req.params.requestId;
     if (!receiverId) { return res.status(401).json({ message: "Yêu cầu xác thực." }); }
 
     try {
         const request = await FriendRequest.findOne({ _id: requestId, status: 'pending' });
 
-        if (!request) { 
-            return res.status(404).json({ message: "Lời mời kết bạn không tồn tại hoặc đã được xử lý." }); 
+        if (!request) {
+            return res.status(404).json({ message: "Lời mời kết bạn không tồn tại hoặc đã được xử lý." });
         }
 
         if (request.receiverId.toString() !== receiverId) {
             return res.status(403).json({ message: "Bạn không phải là người nhận của lời mời này." });
         }
-        
+
         const senderId = request.senderId;
 
         await Promise.all([
-            FriendRequest.findByIdAndDelete(requestId),             
+            FriendRequest.findByIdAndDelete(requestId),
             User.findByIdAndUpdate(senderId, { $push: { friends: receiverId } }),
             User.findByIdAndUpdate(receiverId, { $push: { friends: senderId } })
-        ]);        
-        const newNotification = new Notification({
+        ]);
+        const newNotification = new notificationModel({
             senderId: receiverId,
-            receiverId: senderId, 
+            receiverId: senderId,
             type: 'friend_accept',
-            entityId: receiverId, 
+            entityId: receiverId,
             content: `đã chấp nhận lời mời kết bạn của bạn.`
         });
         const savedNotif = await newNotification.save();
@@ -119,6 +119,12 @@ exports.rejectFriendRequest = async (req, res) => {
             return res.status(400).json({ message: `Lời mời đã ở trạng thái ${request.status}.` });
         }
         await FriendRequest.findByIdAndDelete(requestId);
+
+        await notificationModel.deleteOne({
+            entityId:requestId,
+            type: 'friend_request',
+        });
+
         res.status(200).json({ message: "Đã từ chối lời mời kết bạn." });
     } catch (err) {
         console.error("Lỗi khi từ chối lời mời:", err);
@@ -138,6 +144,11 @@ exports.cancelFriendRequest = async (req, res) => {
         if (request.senderId.toString() !== senderId) {
             return res.status(403).json({ message: "Bạn không phải là người gửi lời mời này." });
         }
+        await notificationModel.deleteOne({
+            entityId:requestId,
+            type: 'friend_request',
+            receiverId: request.receiverId
+        });
         await FriendRequest.findByIdAndDelete(requestId);
         res.status(200).json({ message: "Đã hủy lời mời kết bạn thành công." });
     } catch (err) {

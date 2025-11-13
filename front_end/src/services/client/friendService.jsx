@@ -15,12 +15,16 @@ export const acceptFriendRequest = async (requestId) => {
 
 export const rejectFriendRequest = async (requestId) => {
     const path = `${API_FRIENDS_PATH}/reject/${requestId}`;
-    return putAuth(path, {}); 
+    const result = putAuth(path, {});
+    console.log(result)
+    return result; 
 };
 
 export const cancelSentRequest = async (requestId) => {
     const path = `${API_FRIENDS_PATH}/cancel/${requestId}`;
-    return delAuth(path); 
+    const result = delAuth(path);
+    console.log(result);
+    return result; 
 };
 
 export const getPendingRequests = async (userId) => {

@@ -5,7 +5,8 @@ import { getCookie } from '../../helpers/cookie';
 
 const getUserId = () => getCookie('userId') || null;
 
-const UserCard = ({ user, onUpdateStatus }) => {
+const UserCard = ({ user, onUpdateStatus,requestId }) => {
+    console.log(requestId)
     const currentUserId = getUserId();
     const [requestStatus, setRequestStatus] = useState(user.friendshipStatus || 'none'); 
     const [loading, setLoading] = useState(false);
@@ -43,7 +44,7 @@ const UserCard = ({ user, onUpdateStatus }) => {
         if (!window.confirm("Bạn có chắc muốn hủy lời mời kết bạn này?")) return;
         setLoading(true);
         try {
-            await cancelSentRequest(user._id); 
+            await cancelSentRequest(requestId); 
             alert(`Đã hủy lời mời kết bạn đến ${user.username}.`);
             updateState('none'); 
         } catch (error) {
@@ -58,7 +59,7 @@ const UserCard = ({ user, onUpdateStatus }) => {
         if (!window.confirm(`Bạn có chắc muốn chấp nhận lời mời từ ${user.username} không?`)) return;
         setLoading(true);
         try {
-            await acceptFriendRequest(user._id); 
+            await acceptFriendRequest(requestId); 
             alert(`Đã chấp nhận lời mời từ ${user.username}.`);
             updateState('friend');
         } catch (error) {
@@ -72,7 +73,7 @@ const UserCard = ({ user, onUpdateStatus }) => {
         if (!window.confirm(`Bạn có chắc muốn từ chối lời mời từ ${user.username} không?`)) return;
         setLoading(true);
         try {
-            await rejectFriendRequest(user._id); 
+            await rejectFriendRequest(requestId); 
             alert(`Đã từ chối lời mời từ ${user.username}.`);
             updateState('none'); // Trạng thái trở về none
         } catch (error) {
