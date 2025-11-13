@@ -2,46 +2,62 @@ const Post = require('../../models/post.model');
 const User = require('../../models/user.model');
 const Notification = require('../../models/notification.model');
 
-// [POST] /posts 
+// [POST] /posts
 exports.createPost = async (req, res) => {
-    const { userId, content, image } = req.body;
-    const currentUserId = req.user?.id || userId; 
-    
+    const userId = req.user?.id || req.body.userId; 
+    const { content, image } = req.body;
+
+    if (!userId) {
+        return res.status(401).json({ message: "Yêu cầu xác thực để tạo bài đăng." });
+    }
+
     try {
         const newPost = new Post({
-            userId: currentUserId,
+            userId,
             content,
             image
         });
 
         const savedPost = await newPost.save();
         
-        const currentUser = await User.findById(currentUserId);
-        if (currentUser) {
-            const receivers = [...(currentUser.following || []), ...(currentUser.friends || [])];
-
-            if (global.io && global.activeUsers && receivers.length > 0) {
-                const notificationContent = `đã đăng bài viết mới: "${content.substring(0, 30)}..."`;
-                
-                receivers.forEach(async (receiverId) => {
-                    const receiverIdStr = receiverId.toString();
-
-                    const newNotification = new Notification({
-                        senderId: currentUserId,
-                        receiverId: receiverIdStr,
-                        type: 'new_post',
-                        entityId: savedPost._id,
-                        content: notificationContent
-                    });
-                    const savedNotif = await newNotification.save();                    
-                    const receiverSocketId = global.activeUsers.get(receiverIdStr);
-                    if (receiverSocketId) {
-                        global.io.to(receiverSocketId).emit('newNotification', savedNotif);
-                    }
-                });
-            }
-        }
+        // 1. Lấy thông tin người đăng và danh sách người nhận
+        const currentUser = await User.findById(userId);
         
+        // Gộp ID người theo dõi và ID bạn bè (loại bỏ trùng lặp)
+        const followers = currentUser.followers || [];
+        const friends = currentUser.friends || [];
+        const receivers = [...new Set([...followers, ...friends])];
+
+        const notificationContent = `đã đăng bài viết mới: "${content.substring(0, 30)}..."`;
+        
+        // 2. Xử lý THÔNG BÁO VÀ SOCKET
+        if (global.io && receivers.length > 0) {
+            
+            // Xử lý thông báo đồng thời (Promise.all) để tối ưu
+            await Promise.all(receivers.map(async (receiverId) => {
+                const receiverIdStr = receiverId.toString();
+
+                // Tạo bản ghi thông báo
+                const newNotification = new Notification({
+                    senderId: userId,
+                    receiverId: receiverIdStr,
+                    type: 'new_post',
+                    entityId: savedPost._id, // Liên kết đến bài viết
+                    content: notificationContent
+                });
+                const savedNotif = await newNotification.save();
+                
+                // Gửi tín hiệu real-time nếu người nhận đang online
+                const receiverSocketId = global.activeUsers.get(receiverIdStr);
+                if (receiverSocketId) {
+                    global.io.to(receiverSocketId).emit('newNotification', savedNotif);
+                }
+            }));
+        }
+
+        // Tùy chọn: Phát sóng bài đăng mới lên Feed của mọi người đang online (sự kiện 'newPost')
+        // global.io.emit('newPost', savedPost);
+
         res.status(201).json({
             message: "Bài đăng đã được tạo thành công.",
             post: savedPost
@@ -51,7 +67,6 @@ exports.createPost = async (req, res) => {
         res.status(500).json({ message: "Lỗi Server nội bộ.", error: err.message });
     }
 };
-
 // [PUT] /posts/:id 
 exports.updatePost = async (req, res) => {
     const postId = req.params.id;
