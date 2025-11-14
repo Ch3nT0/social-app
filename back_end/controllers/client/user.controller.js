@@ -6,7 +6,7 @@ const bcrypt = require('bcrypt');
 // [PUT] /users/:id - Cập nhật thông tin người dùng
 exports.updateUser = async (req, res) => {
     const userId = req.params.id;
-    if (req.body.currentUserId === userId || req.body.isAdmin) {
+    if (req.user.userId === userId || req.body.isAdmin) {
         try {
             if (req.body.password) {
                 const salt = await bcrypt.genSalt(10);

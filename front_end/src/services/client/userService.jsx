@@ -37,3 +37,9 @@ export const getSuggestedUsers = async (userId) => {
     const result = await getAuth(path);
     return result;
 };
+
+export const updateUser = async (userId, dataToUpdate) =>{
+    const path = `${API_USERS_PATH}/${userId}`;
+    const result = await putAuth(path,dataToUpdate);
+    return result;
+}

@@ -1,21 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom'; 
+import { useNavigate, useParams } from 'react-router-dom'; 
 import Post from '../../../components/Post/Post';
 import Share from '../../../components/Share/Share';
 import { getUserProfile } from '../../../services/client/userService'; 
 import { getUserPosts } from '../../../services/client/postService'; 
+import { getCookie } from '../../../helpers/cookie'; 
+import { followUser, unfollowUser } from '../../../services/client/userService'; 
+
+// Hàm lấy ID người dùng hiện tại từ cookie
+const getCurrentUserId = () => getCookie('userId') || null;
 
 const Profile = () => {
     const { id: profileId } = useParams(); 
-    
+    const navigate = useNavigate();
     const [user, setUser] = useState(null);
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     
-    const CURRENT_USER_ID = "60c72b2f9a7d3c0015f624e5"; 
+    // ⭐️ Lấy ID động từ cookie
+    const loggedInUserId = getCurrentUserId(); 
     
     const [isFollowing, setIsFollowing] = useState(false);
+
+    // Xác định xem người xem có phải là chủ hồ sơ không
+    const isOwner = profileId === loggedInUserId; 
+    
+    // ----------------------------------------------------
+    // EFFECTS & FETCH DATA
+    // ----------------------------------------------------
 
     useEffect(() => {
         if (!profileId) return;
@@ -28,8 +41,9 @@ const Profile = () => {
                 const userData = await getUserProfile(profileId);
                 setUser(userData);
 
-                if (userData && Array.isArray(userData.followers)) {
-                    setIsFollowing(userData.followers.includes(CURRENT_USER_ID));
+                // Kiểm tra trạng thái theo dõi (chỉ khi không phải là chủ sở hữu)
+                if (userData && Array.isArray(userData.followers) && loggedInUserId) {
+                    setIsFollowing(userData.followers.includes(loggedInUserId));
                 }
                 
                 const userPosts = await getUserPosts(profileId); 
@@ -53,23 +67,40 @@ const Profile = () => {
         };
 
         fetchData();
-    }, [profileId, CURRENT_USER_ID]);
+    }, [profileId, loggedInUserId]); 
 
-    const handleFollow = () => {
+
+    const handleFollow = async () => {
+        if (!loggedInUserId) {
+            alert("Vui lòng đăng nhập để theo dõi.");
+            return;
+        }
+
+        const action = isFollowing ? unfollowUser : followUser;
+        const previousFollowing = isFollowing;
+
+        // Optimistic Update
+        setIsFollowing(!isFollowing);
+        setUser(prev => ({
+            ...prev,
+            followers: isFollowing 
+                ? prev.followers.filter(id => id !== loggedInUserId)
+                : [...prev.followers, loggedInUserId]
+        }));
+
         try {
-            // Logic gọi service follow/unfollow
-            
-            setIsFollowing(!isFollowing); 
-            
-            setUser(prev => ({
-                ...prev,
-                followers: isFollowing 
-                    ? prev.followers.filter(id => id !== CURRENT_USER_ID)
-                    : [...prev.followers, CURRENT_USER_ID]
-            }));
-            
+            await action(profileId); // Gọi PUT /users/:id/follow hoặc unfollow
         } catch (error) {
             console.error("Lỗi hành động follow:", error);
+            alert("Thao tác thất bại. Vui lòng thử lại.");
+            // Hoàn nguyên
+            setIsFollowing(previousFollowing);
+            setUser(prev => ({
+                ...prev,
+                followers: previousFollowing 
+                    ? prev.followers.filter(id => id !== loggedInUserId)
+                    : [...prev.followers, loggedInUserId]
+            }));
         }
     };
 
@@ -107,23 +138,25 @@ const Profile = () => {
                     <p className="text-gray-600 mt-1">{user.desc || "Chưa có mô tả"}</p>
                     
                     <div className="mt-4 flex space-x-3">
-                        {profileId !== CURRENT_USER_ID ? (
-                            <button 
-                                onClick={handleFollow}
-                                className={`px-4 py-2 rounded-full font-semibold transition ${
-                                    isFollowing ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-blue-600 text-white hover:bg-blue-700'
-                                }`}
-                            >
-                                {isFollowing ? 'Hủy Theo dõi' : 'Theo dõi'}
-                            </button>
-                        ) : (
-                            <button className="bg-gray-200 text-gray-800 px-4 py-2 rounded-full font-semibold hover:bg-gray-300 transition">
+                        {isOwner ? (
+                            <button className="bg-gray-200 text-gray-800 px-4 py-2 rounded-full font-semibold hover:bg-gray-300 transition" onClick={() => navigate("/profile/edit")}>
                                 Chỉnh sửa Hồ sơ
                             </button>
+                        ) : (
+                            <>
+                                <button 
+                                    onClick={handleFollow}
+                                    className={`px-4 py-2 rounded-full font-semibold transition ${
+                                        isFollowing ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-blue-600 text-white hover:bg-blue-700'
+                                    }`}
+                                >
+                                    {isFollowing ? 'Hủy Theo dõi' : 'Theo dõi'}
+                                </button>
+                                <button className="bg-green-500 text-white px-4 py-2 rounded-full font-semibold hover:bg-green-600 transition">
+                                    Nhắn tin
+                                </button>
+                            </>
                         )}
-                        <button className="bg-green-500 text-white px-4 py-2 rounded-full font-semibold hover:bg-green-600 transition">
-                            Nhắn tin
-                        </button>
                     </div>
                 </div>
             </div>
@@ -141,7 +174,8 @@ const Profile = () => {
                 </div>
 
                 <div className="w-full lg:w-2/3 space-y-6">
-                    {profileId === CURRENT_USER_ID && <Share />} 
+                    {/* ⭐️ CHỈ HIỆN SHARE KHI LÀ CHỦ HỒ SƠ */}
+                    {isOwner && <Share />} 
 
                     <h3 className="text-2xl font-bold text-gray-800 border-b pb-2">Bài đăng</h3>
                     

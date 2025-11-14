@@ -6,6 +6,7 @@ import Login from "../pages/client/Login";
 import Register from "../pages/client/register";
 import SearchFriendsPage from "../pages/client/SearchFriendsPage";
 import FriendsPage from "../pages/client/FriendsPage/FriendsPage";
+import EditProfilePage from "../pages/EditProfile";
 
 
 const URL_ADMIN = '/admin'
@@ -29,6 +30,10 @@ export const routes = [
             }, {
                 path: '/friends',
                 element: <FriendsPage />
+            }
+            ,{
+                path: '/profile/edit',
+                element: <EditProfilePage/>
             }
         ]
     },
