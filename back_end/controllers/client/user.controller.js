@@ -87,8 +87,7 @@ exports.getFriends = async (req, res) => {
 // [PUT] /users/:id/follow - Theo dõi người dùng
 exports.followUser = async (req, res) => {
     const userIdToFollow = req.params.id;
-    const currentUserId = req.body.currentUserId;
-
+    const currentUserId = req.user.userId;
     if (currentUserId === userIdToFollow) {
         return res.status(403).json({ message: "Bạn không thể tự theo dõi chính mình." });
     }
@@ -117,7 +116,7 @@ exports.followUser = async (req, res) => {
 //[PUT] /users/:id/unfollow - Bỏ theo dõi người dùng
 exports.unfollowUser = async (req, res) => {
     const userIdToUnfollow = req.params.id;
-    const currentUserId = req.body.currentUserId;
+    const currentUserId = req.user.userId;
 
     if (currentUserId === userIdToUnfollow) {
         return res.status(403).json({ message: "Bạn không thể tự bỏ theo dõi chính mình." });

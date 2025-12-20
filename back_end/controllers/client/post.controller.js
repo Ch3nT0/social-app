@@ -102,15 +102,13 @@ exports.updatePost = async (req, res) => {
 //[DELETE] /posts/:id 
 exports.deletePost = async (req, res) => {
     const postId = req.params.id;
-    const { userId } = req.body;
+    const { userId } = req.user;
 
     try {
         const post = await Post.findById(postId);
-
         if (!post) {
             return res.status(404).json({ message: "Bài đăng không tồn tại." });
         }
-
         if (post.userId.toString() !== userId) {
             return res.status(403).json({ message: "Bạn chỉ có thể xóa bài đăng của mình." });
         }

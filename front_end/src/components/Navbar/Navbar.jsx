@@ -151,7 +151,7 @@ const Navbar = () => {
                     <form onSubmit={handleSearchSubmit}>
                         <input
                             type="text"
-                            placeholder="Tìm kiếm bạn bè, bài đăng..."
+                            placeholder="Tìm kiếm bạn bè"
                             className="w-full p-2.5 bg-gray-100 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300 transition duration-150 text-sm"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -167,9 +167,6 @@ const Navbar = () => {
 
                         {/* Icons Cố định */}
                         <div className="flex space-x-3">
-                            <Link to="/" className="p-2 rounded-full hover:bg-gray-100 text-gray-600 relative">🏠</Link>
-                            <button className="p-2 rounded-full hover:bg-gray-100 text-gray-600 relative">💬</button>
-
                             {/* DROPDOWN THÔNG BÁO */}
                             <div className="relative" ref={notifRef}>
                                 <button onClick={toggleNotifications} className="p-2 rounded-full hover:bg-gray-100 text-gray-600 relative">
