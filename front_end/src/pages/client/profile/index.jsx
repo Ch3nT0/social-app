@@ -169,7 +169,6 @@ const Profile = () => {
                 </div>
 
                 <div className="w-full lg:w-2/3 space-y-6">
-                    {/* ⭐️ CHỈ HIỆN SHARE KHI LÀ CHỦ HỒ SƠ */}
                     {isOwner && <Share
                         onPostCreated={handleNewPostCreated}
                         userAvatar={user.profilePicture}

@@ -10,43 +10,44 @@ import PendingRequestCard from '../../../components/UserCard/PendingRequestCard'
 
 const getUserId = () => getCookie('userId') || null;
 
-// Component hiển thị từng người bạn
+
 const FriendListItem = ({ friend, onUnfriendSuccess }) => {
     const [loading, setLoading] = useState(false);
     
     const handleUnfriend = async () => {
-        if (!window.confirm(`Bạn có chắc muốn xóa bạn với ${friend.username} không?`)) return;
+        if (!window.confirm(`Xóa kết bạn với ${friend.username}?`)) return;
         setLoading(true);
         try {
             await unfriendUser(friend._id); 
             onUnfriendSuccess(friend._id); 
         } catch (error) {
-            console.error("Lỗi xóa bạn:", error);
-            alert("Lỗi khi xóa bạn bè.");
+            console.error(error);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition duration-200">
+        <div className="group flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-100 transition-all duration-300">
             <div className="flex items-center space-x-4">
-                <img 
-                    className="w-12 h-12 rounded-full object-cover border border-gray-100" 
-                    src={friend.profilePicture || "https://via.placeholder.com/150/0000FF/FFFFFF?text=U"} 
-                    alt={friend.username}
-                />
+                <div className="relative">
+                    <img 
+                        className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-sm" 
+                        src={friend.profilePicture || "https://via.placeholder.com/150"} 
+                        alt={friend.username}
+                    />
+                    <span className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></span>
+                </div>
                 <div>
-                    <Link to={`/profile/${friend._id}`} className="font-bold text-gray-800 hover:text-blue-600 transition">
+                    <Link to={`/profile/${friend._id}`} className="font-bold text-gray-800 hover:text-blue-600 transition-colors block text-lg">
                         {friend.username}
                     </Link>
-                    <p className="text-xs text-gray-500">📍 {friend.city || "Chưa cập nhật địa chỉ"}</p>
                 </div>
             </div>
 
             <button 
                 onClick={handleUnfriend}
-                className="bg-gray-100 text-gray-600 text-sm px-4 py-2 rounded-full hover:bg-red-50 hover:text-red-600 transition font-medium"
+                className="opacity-0 group-hover:opacity-100 focus:opacity-100 bg-red-50 text-red-600 text-xs sm:text-sm px-5 py-2 rounded-xl hover:bg-red-600 hover:text-white transition-all duration-200 font-bold shadow-sm"
                 disabled={loading}
             >
                 {loading ? '...' : 'Hủy kết bạn'}
@@ -121,7 +122,7 @@ const FriendsPage = () => {
                     <h3 className="text-lg font-bold mb-4 text-orange-500 flex items-center">
                         🔔 Lời mời kết bạn ({pendingRequests.length})
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-3">
                         {pendingRequests.map(req => (
                             <PendingRequestCard 
                                 key={req._id} 
@@ -159,14 +160,13 @@ const FriendsPage = () => {
                 <h3 className="text-lg font-bold mb-4 text-blue-600 border-b pb-2">
                     Gợi ý dành cho bạn
                 </h3>
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-3">
                     {suggestions.length > 0 ? (
                         suggestions.map(user => (
                             <UserCard 
                                 key={user._id} 
                                 user={user} 
                                 onUpdateStatus={() => {
-                                    // Khi bấm kết bạn ở Card gợi ý, ẩn người đó đi hoặc fetch lại
                                     setSuggestions(prev => prev.filter(s => s._id !== user._id));
                                 }} 
                             />

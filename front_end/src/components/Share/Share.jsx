@@ -2,54 +2,52 @@ import React, { useState } from 'react';
 import { createPost } from '../../services/client/postService'; 
 import { getCookie } from '../../helpers/cookie';
 import { handleUpload } from '../../helpers/uploaFileToCloud'; 
-// Đảm bảo import model-viewer để dùng cho phần preview
 import '@google/model-viewer';
 
 const getUserId = () => getCookie('userId') || null;
 
 const Share = ({ onPostCreated, userAvatar, userName }) => {
     const [content, setContent] = useState('');
-    const [file, setFile] = useState(null);
+    const [files, setFiles] = useState([]); // Chuyển thành mảng files
     const [isUploading, setIsUploading] = useState(false);
     
     const currentUserId = getUserId(); 
     const displayAvatar = userAvatar || "https://via.placeholder.com/150/FF0000/FFFFFF?text=U"; 
-    
-    // Tạo URL để xem trước (Preview)
-    const filePreviewUrl = file ? URL.createObjectURL(file) : null;
-    const is3DModel = file?.name.endsWith('.glb');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        if (!content && !file) return;
+        if (!content && files.length === 0) return;
         if (!currentUserId) {
             alert("Bạn cần đăng nhập để tạo bài đăng.");
             return;
         }
 
         setIsUploading(true);
-        let uploadedFileUrl = ""; 
+        let uploadedUrls = [];
+        let model3dUrl = "";
 
         try {
-            if (file) {
-                // Xác định loại file để Cloudinary xử lý đúng
-                // .glb thường được xử lý như "raw" hoặc "video" (tùy config backend)
-                // Ở đây ta giả định handleUpload nhận file trực tiếp
-                const fileType = is3DModel ? "video" : (file.type.startsWith('video/') ? "video" : "image");
-                uploadedFileUrl = await handleUpload(file, fileType); 
-
-                if (!uploadedFileUrl) {
-                    throw new Error("Không nhận được URL từ dịch vụ lưu trữ.");
+            // Duyệt qua tất cả các file đã chọn để upload
+            for (const file of files) {
+                const is3D = file.name.endsWith('.glb');
+                const fileType = is3D ? "video" : (file.type.startsWith('video/') ? "video" : "image");
+                
+                const url = await handleUpload(file, fileType);
+                
+                if (is3D) {
+                    model3dUrl = url; // Lưu URL model 3D (thường chỉ 1 cái mỗi post)
+                } else {
+                    uploadedUrls.push(url); // Lưu vào danh sách ảnh/video
                 }
             }
             
             const postData = {
                 userId: currentUserId, 
                 content: content,
-                // Nếu là 3D thì gán vào model3d, nếu là ảnh thì gán vào image
-                image: !is3DModel ? (uploadedFileUrl || "") : "",
-                model3d: is3DModel ? (uploadedFileUrl || "") : ""
+                // Gửi mảng các URL ảnh (hoặc chuỗi nếu backend bạn chưa sửa thành mảng)
+                image: uploadedUrls, 
+                model3d: model3dUrl
             };
             
             const result = await createPost(postData);
@@ -63,44 +61,41 @@ const Share = ({ onPostCreated, userAvatar, userName }) => {
                     profilePicture: userAvatar
                 };
                 
-                // Đồng bộ dữ liệu để Post.jsx hiển thị ngay lập tức
                 const finalPost = { 
                     ...result.post, 
                     userId: populatedUser,
-                    image: postData.image,
-                    model3d: postData.model3d
+                    // Đảm bảo dữ liệu truyền ngược lại cho Feed khớp với những gì Post.jsx mong đợi
+                    image: uploadedUrls, 
+                    model3d: model3dUrl
                 }; 
 
-                if (onPostCreated) {
-                    onPostCreated(finalPost);
-                }
+                if (onPostCreated) onPostCreated(finalPost);
                 
-                // Reset form
                 setContent('');
-                setFile(null);
-            } else {
-                 alert("Lỗi đăng bài: " + (result.message || "Không rõ lỗi."));
+                setFiles([]);
             }
-
         } catch (error) {
             console.error("Lỗi khi tạo bài đăng:", error);
-            alert(error.message || "Có lỗi xảy ra khi tạo bài đăng.");
+            alert("Có lỗi xảy ra khi tạo bài đăng.");
         } finally {
             setIsUploading(false);
         }
     };
     
     const handleFileChange = (e) => {
-        const selectedFile = e.target.files[0];
-        if (selectedFile) {
-            setFile(selectedFile);
-        }
+        const selectedFiles = Array.from(e.target.files);
+        // Hợp nhất với danh sách đã chọn trước đó hoặc thay thế mới
+        setFiles((prev) => [...prev, ...selectedFiles]);
+    };
+
+    const removeFile = (index) => {
+        setFiles((prev) => prev.filter((_, i) => i !== index));
     };
 
     return (
         <div className="bg-white p-4 rounded-xl shadow-xl border border-gray-200">
             <div className="flex items-start space-x-3 border-b pb-4 mb-4">
-                <img className="w-12 h-12 rounded-full object-cover flex-shrink-0" src={displayAvatar} alt={userName || "User"} />
+                <img className="w-12 h-12 rounded-full object-cover flex-shrink-0" src={displayAvatar} alt={userName} />
                 
                 <form onSubmit={handleSubmit} className="flex-grow"> 
                     <textarea 
@@ -111,28 +106,32 @@ const Share = ({ onPostCreated, userAvatar, userName }) => {
                         onChange={(e) => setContent(e.target.value)} 
                     />
 
-                    {/* PHẦN PREVIEW FILE */}
-                    {file && (
-                        <div className="relative mt-2 p-2 border rounded-lg bg-gray-50">
-                            <button type="button" onClick={() => setFile(null)} className="absolute top-1 right-1 z-10 text-white bg-red-500 rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition">×</button>
-                            
-                            {/* Nếu là file 3D */}
-                            {is3DModel ? (
-                                <div className="h-48 w-full bg-gray-200 rounded">
-                                    <model-viewer
-                                        src={filePreviewUrl}
-                                        camera-controls
-                                        auto-rotate
-                                        style={{ width: '100%', height: '100%' }}
-                                    ></model-viewer>
-                                </div>
-                            ) : (
-                                /* Nếu là ảnh */
-                                file.type.startsWith('image/') && (
-                                    <img src={filePreviewUrl} alt="Preview" className="max-h-40 w-auto rounded" />
-                                )
-                            )}
-                            <p className="text-xs text-gray-500 mt-1 truncate">{file.name}</p>
+                    {/* HIỂN THỊ DANH SÁCH FILE PREVIEW */}
+                    {files.length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                            {files.map((file, index) => {
+                                const is3D = file.name.endsWith('.glb');
+                                const url = URL.createObjectURL(file);
+                                return (
+                                    <div key={index} className="relative aspect-square border rounded-lg bg-gray-50 overflow-hidden group">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => removeFile(index)} 
+                                            className="absolute top-1 right-1 z-20 text-white bg-red-500 rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600 transition opacity-0 group-hover:opacity-100"
+                                        >
+                                            ×
+                                        </button>
+                                        
+                                        {is3D ? (
+                                            <model-viewer src={url} style={{width: '100%', height: '100%'}} auto-rotate></model-viewer>
+                                        ) : file.type.startsWith('image/') ? (
+                                            <img src={url} alt="preview" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full text-[10px] text-gray-500">Video</div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </form>
@@ -140,13 +139,14 @@ const Share = ({ onPostCreated, userAvatar, userName }) => {
             
             <div className="flex justify-between items-center pt-2">
                 <div className="flex space-x-4">
-                    {/* Chấp nhận thêm .glb */}
                     <label htmlFor="file-input" className="flex items-center space-x-1 cursor-pointer text-green-500 hover:text-green-600 transition duration-150 font-medium">
-                        <span>🖼️ Ảnh/Video/3D</span> 
+                        <span className="text-xl">🖼️</span>
+                        <span className="text-sm">Ảnh/Video/3D</span> 
                         <input 
                             type="file" 
                             id="file-input" 
                             className="hidden" 
+                            multiple // QUAN TRỌNG: Cho phép chọn nhiều file
                             accept=".png,.jpeg,.jpg,.mp4,.glb" 
                             onChange={handleFileChange} 
                         />
@@ -156,12 +156,12 @@ const Share = ({ onPostCreated, userAvatar, userName }) => {
                 <button 
                     type="submit" 
                     onClick={handleSubmit} 
-                    className={`px-6 py-2 rounded-full text-white font-semibold transition duration-200 flex items-center ${
-                        (content || file) && !isUploading ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-300 cursor-not-allowed'
+                    className={`px-6 py-2 rounded-full text-white font-semibold transition duration-200 ${
+                        (content || files.length > 0) && !isUploading ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-300 cursor-not-allowed'
                     }`} 
-                    disabled={(!content && !file) || isUploading}
+                    disabled={(!content && files.length === 0) || isUploading}
                 >
-                    {isUploading ? (<span className="animate-spin mr-2 text-sm">🔄</span>) : ('Đăng')}
+                    {isUploading ? (<span className="animate-spin mr-2">🔄</span>) : ('Đăng')}
                 </button>
             </div>
         </div>

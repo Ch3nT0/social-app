@@ -1,16 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { sendFriendRequest, cancelSentRequest, unfriendUser, acceptFriendRequest, rejectFriendRequest } from '../../services/client/friendService';
+import { 
+    sendFriendRequest, 
+    cancelSentRequest, 
+    unfriendUser, 
+    acceptFriendRequest, 
+    rejectFriendRequest 
+} from '../../services/client/friendService';
 import { getCookie } from '../../helpers/cookie';
 
 const getUserId = () => getCookie('userId') || null;
 
-const UserCard = ({ user, onUpdateStatus,requestId }) => {
-    console.log(requestId)
+const UserCard = ({ user, onUpdateStatus, requestId }) => {
     const currentUserId = getUserId();
+    
     const [requestStatus, setRequestStatus] = useState(user.friendshipStatus || 'none'); 
     const [loading, setLoading] = useState(false);
     
+    useEffect(() => {
+        if (user.friendshipStatus) {
+            setRequestStatus(user.friendshipStatus);
+        } else {
+            setRequestStatus('none');
+        }
+    }, [user.friendshipStatus, user._id]);
+
     const isCurrentUser = currentUserId === user._id;
 
     const updateState = (newStatus) => {
@@ -20,163 +34,154 @@ const UserCard = ({ user, onUpdateStatus,requestId }) => {
 
     const handleSendRequest = async () => {
         if (!currentUserId) {
-            alert("Vui lòng đăng nhập để gửi lời mời kết bạn.");
+            alert("Vui lòng đăng nhập để thực hiện.");
             return;
         }
         setLoading(true);
         try {
             const result = await sendFriendRequest(user._id); 
-            if (result && result.request) {
-                alert(`Đã gửi lời mời kết bạn đến ${user.username}.`);
+            alert(result.message || "Đã gửi lời mời kết bạn.");
+            if (result) {
                 updateState('pending_sent');
-            } else {
-                alert(result.message || "Gửi lời mời thất bại.");
             }
         } catch (error) {
             console.error("Lỗi gửi lời mời:", error);
-            alert("Lỗi kết nối server khi gửi lời mời.");
+            alert("Không thể gửi lời mời kết bạn.");
         } finally {
             setLoading(false);
         }
     };
     
     const handleCancelRequest = async () => {
-        if (!window.confirm("Bạn có chắc muốn hủy lời mời kết bạn này?")) return;
         setLoading(true);
         try {
-            await cancelSentRequest(requestId); 
-            alert(`Đã hủy lời mời kết bạn đến ${user.username}.`);
+            // Lưu ý: requestId cần được truyền từ component cha 
+            // hoặc lấy từ user.requestId nếu backend trả về
+            await cancelSentRequest(requestId || user.requestId); 
             updateState('none'); 
         } catch (error) {
             console.error("Lỗi hủy lời mời:", error);
-            alert("Lỗi khi hủy lời mời.");
         } finally {
             setLoading(false);
         }
     };
 
     const handleAcceptRequest = async () => {
-        if (!window.confirm(`Bạn có chắc muốn chấp nhận lời mời từ ${user.username} không?`)) return;
         setLoading(true);
         try {
-            await acceptFriendRequest(requestId); 
-            alert(`Đã chấp nhận lời mời từ ${user.username}.`);
+            await acceptFriendRequest(requestId || user.requestId); 
             updateState('friend');
         } catch (error) {
-            console.error("Lỗi chấp nhận lời mời:", error);
-            alert("Lỗi khi chấp nhận lời mời.");
+            console.error("Lỗi chấp nhận:", error);
         } finally {
             setLoading(false);
         }
     };    
+
     const handleRejectRequest = async () => {
-        if (!window.confirm(`Bạn có chắc muốn từ chối lời mời từ ${user.username} không?`)) return;
         setLoading(true);
         try {
-            await rejectFriendRequest(requestId); 
-            alert(`Đã từ chối lời mời từ ${user.username}.`);
-            updateState('none'); // Trạng thái trở về none
+            await rejectFriendRequest(requestId || user.requestId); 
+            updateState('none');
         } catch (error) {
-            console.error("Lỗi từ chối lời mời:", error);
-            alert("Lỗi khi từ chối lời mời.");
+            console.error("Lỗi từ chối:", error);
         } finally {
             setLoading(false);
         }
     };
     
     const handleUnfriend = async () => {
-        if (!window.confirm(`Bạn có chắc muốn xóa bạn với ${user.username} không?`)) return;
+        if (!window.confirm(`Xóa kết bạn với ${user.username}?`)) return;
         setLoading(true);
         try {
             await unfriendUser(user._id); 
-            alert(`Đã xóa bạn với ${user.username}.`);
             updateState('none');
         } catch (error) {
             console.error("Lỗi xóa bạn:", error);
-            alert("Lỗi khi xóa bạn bè.");
         } finally {
             setLoading(false);
         }
     };
 
+    // Hàm render nút bấm dựa trên trạng thái hiện tại
     const renderActionButton = () => {
-        if (isCurrentUser) {
-            return null;
-        }
+        if (isCurrentUser) return <span className="text-xs text-gray-400 italic">Bạn</span>;
         
-        if (requestStatus === 'friend') {
-            return (
-                <button 
-                    onClick={handleUnfriend} 
-                    className="bg-red-500 text-white text-sm px-3 py-1 rounded-full hover:bg-red-600 transition disabled:opacity-70"
-                    disabled={loading}
-                >
-                    {loading ? 'Đang xóa...' : 'Xóa bạn'}
-                </button>
-            );
-        }
         
-        if (requestStatus === 'pending_sent') {
-            return (
-                <button 
-                    onClick={handleCancelRequest}
-                    className="bg-gray-500 text-white text-sm px-3 py-1 rounded-full hover:bg-gray-600 transition disabled:opacity-70"
-                    disabled={loading}
-                >
-                    {loading ? 'Đang hủy...' : 'Hủy lời mời'}
-                </button>
-            );
-        }
-        
-        if (requestStatus === 'pending_received') {
-            return (
-                <div className="flex space-x-2">
+
+        switch (requestStatus) {
+            case 'friend':
+                return (
                     <button 
-                        onClick={handleAcceptRequest}
-                        className="bg-green-600 text-white text-sm px-3 py-1 rounded-full hover:bg-green-700 transition"
+                        onClick={handleUnfriend} 
+                        className="bg-gray-100 text-red-500 text-sm px-4 py-1.5 rounded-full hover:bg-red-50 transition font-medium"
                         disabled={loading}
                     >
-                        {loading ? '...' : 'Chấp nhận'}
+                        {loading ? '...' : 'Hủy kết bạn'}
                     </button>
+                );
+            case 'pending_sent':
+                return (
                     <button 
-                        onClick={handleRejectRequest}
-                        className="bg-red-600 text-white text-sm px-3 py-1 rounded-full hover:bg-red-700 transition"
+                        onClick={handleCancelRequest}
+                        className="bg-gray-200 text-gray-700 text-sm px-4 py-1.5 rounded-full hover:bg-gray-300 transition font-medium"
                         disabled={loading}
                     >
-                        Từ chối
+                        {loading ? '...' : 'Hủy lời mời'}
                     </button>
-                </div>
-            );
+                );
+            case 'pending_received':
+                return (
+                    <div className="flex space-x-2">
+                        <button 
+                            onClick={handleAcceptRequest}
+                            className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-full hover:bg-blue-700 transition font-medium"
+                            disabled={loading}
+                        >
+                            {loading ? '...' : 'Chấp nhận'}
+                        </button>
+                        <button 
+                            onClick={handleRejectRequest}
+                            className="bg-gray-100 text-gray-600 text-sm px-4 py-1.5 rounded-full hover:bg-gray-200 transition font-medium"
+                            disabled={loading}
+                        >
+                            Xóa
+                        </button>
+                    </div>
+                );
+            default: // 'none'
+                return (
+                    <button 
+                        onClick={handleSendRequest}
+                        className="bg-blue-50 text-blue-600 text-sm px-4 py-1.5 rounded-full hover:bg-blue-600 hover:text-white transition font-bold"
+                        disabled={loading}
+                    >
+                        {loading ? '...' : 'Thêm bạn bè'}
+                    </button>
+                );
         }
-        
-        return (
-            <button 
-                onClick={handleSendRequest}
-                className="bg-blue-500 text-white text-sm px-3 py-1 rounded-full hover:bg-blue-600 transition disabled:bg-blue-300"
-                disabled={loading}
-            >
-                {loading ? 'Đang gửi...' : 'Kết bạn'}
-            </button>
-        );
     };
 
     return (
-        <div className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm border border-gray-100">
-            <div className="flex items-center space-x-3">
-                <img 
-                    className="w-12 h-12 rounded-full object-cover" 
-                    src={user.profilePicture || "https://via.placeholder.com/150/0000FF/FFFFFF?text=U"} 
-                    alt={user.username}
-                />
+        <div className="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-gray-50 hover:border-blue-100 transition duration-200">
+            <div className="flex items-center space-x-4">
+                <div className="relative">
+                    <img 
+                        className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" 
+                        src={user.profilePicture || "https://via.placeholder.com/150/0000FF/FFFFFF?text=U"} 
+                        alt={user.username}
+                    />
+                </div>
                 <div>
-                    <Link to={`/profile/${user._id}`} className="font-semibold text-gray-800 hover:text-blue-600 hover:underline">
+                    <Link to={`/profile/${user._id}`} className="font-bold text-gray-800 hover:text-blue-600 transition">
                         {user.username}
                     </Link>
-                    <p className="text-xs text-gray-500">{user.city || user.desc}</p>
                 </div>
             </div>
             
-            {renderActionButton()}
+            <div className="ml-4">
+                {renderActionButton()}
+            </div>
         </div>
     );
 };

@@ -15,7 +15,8 @@ const PostSchema = new mongoose.Schema({
         default: ""
     },
     image: {
-        type: String 
+        type: [String],
+        default: []
     },
     likes: {
         type: Array,
@@ -26,7 +27,7 @@ const PostSchema = new mongoose.Schema({
         default: 0 // Số lượng comment (dùng để hiển thị nhanh)
     }
 },
-{ timestamps: true }
+    { timestamps: true }
 );
 
 module.exports = mongoose.model("Post", PostSchema);

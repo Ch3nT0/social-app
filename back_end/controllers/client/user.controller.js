@@ -148,7 +148,8 @@ exports.unfollowUser = async (req, res) => {
 // [GET] /api/users/search?q=keyword
 exports.searchUsers = async (req, res) => {
     const keyword = req.query.q;
-    const currentUserId = req.user?.userId;
+    // Đảm bảo lấy đúng ID người dùng và chuyển về String để so sánh
+    const currentUserId = req.user?.userId || req.user?.id; 
 
     if (!keyword || keyword.length < 2) {
         return res.status(200).json([]);
@@ -156,6 +157,7 @@ exports.searchUsers = async (req, res) => {
     
     try {
         const regex = new RegExp(keyword, 'i');
+        // 1. Tìm kiếm tất cả người dùng thỏa mãn điều kiện
         let searchResults = await User.find({
             $or: [
                 { username: { $regex: regex } },
@@ -165,55 +167,60 @@ exports.searchUsers = async (req, res) => {
         })
             .select('_id username profilePicture city friends')
             .limit(20)
-            .lean();
+            .lean(); // Dùng lean() để trả về plain JS object, giúp xử lý nhanh hơn
 
         if (!currentUserId || searchResults.length === 0) {
-            return res.status(200).json(searchResults.map(user => ({ ...user, friendshipStatus: 'none' })));
+            return res.status(200).json(searchResults.map(({ friends, ...user }) => ({ ...user, friendshipStatus: 'none' })));
         }
 
         const resultUserIds = searchResults.map(user => user._id);
+        const currentUserIdStr = currentUserId.toString();
 
+        // 2. Lấy danh sách các lời mời kết bạn liên quan giữa mình và các kết quả tìm kiếm
         const pendingRequests = await FriendRequest.find({
             status: 'pending',
             $or: [
-                { senderId: currentUserId, receiverId: { $in: resultUserIds } },
-                { senderId: { $in: resultUserIds }, receiverId: currentUserId }
+                { senderId: currentUserIdStr, receiverId: { $in: resultUserIds } },
+                { senderId: { $in: resultUserIds }, receiverId: currentUserIdStr }
             ]
         });
 
+        // 3. Map để gán nhãn friendshipStatus
         const finalResults = searchResults.map(user => {
-            // 1. Kiểm tra bạn bè
-            if (user.friends.includes(currentUserId)) {
+            const userIdStr = user._id.toString();
+            
+            // --- KIỂM TRA 1: ĐÃ LÀ BẠN BÈ ---
+            // Chuyển mảng friends sang String để so sánh chính xác
+            const isFriend = user.friends.some(f => f.toString() === currentUserIdStr);
+            if (isFriend) {
                 return { ...user, friendshipStatus: 'friend' };
             }
 
-            // 2. Kiểm tra lời mời đang chờ
+            // --- KIỂM TRA 2: LỜI MỜI ĐANG CHỜ ---
             const pendingReq = pendingRequests.find(req =>
-                req.senderId.toString() === user._id.toString() || req.receiverId.toString() === user._id.toString()
+                req.senderId.toString() === userIdStr || req.receiverId.toString() === userIdStr
             );
 
             if (pendingReq) {
-                // ⭐️ THÊM REQUEST ID VÀO baseResult
                 const baseResult = { 
                     ...user, 
                     requestId: pendingReq._id.toString() 
                 }; 
                 
-                if (pendingReq.senderId.toString() === currentUserId) {
-                    // Mình đã gửi -> Dùng requestId để Hủy lời mời
+                if (pendingReq.senderId.toString() === currentUserIdStr) {
                     return { ...baseResult, friendshipStatus: 'pending_sent' };
                 } else {
-                    // Họ đã gửi cho mình -> Dùng requestId để Chấp nhận/Từ chối
                     return { ...baseResult, friendshipStatus: 'pending_received' };
                 }
             }
 
-            // Mặc định
+            // Mặc định: Không có mối quan hệ
             return { ...user, friendshipStatus: 'none' };
         });
 
-        // Loại bỏ trường 'friends' khỏi output cuối cùng
+        // 4. Loại bỏ trường 'friends' khỏi output để bảo mật và giảm dung lượng data
         const finalOutput = finalResults.map(({ friends, ...user }) => user);
+        
         res.status(200).json(finalOutput);
 
     } catch (err) {
