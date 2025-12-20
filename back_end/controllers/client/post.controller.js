@@ -5,7 +5,7 @@ const Notification = require('../../models/notification.model');
 // [POST] /posts
 exports.createPost = async (req, res) => {
     const userId = req.user?.id || req.body.userId; 
-    const { content, image } = req.body;
+    const { content, image, model3d } = req.body;
 
     if (!userId) {
         return res.status(401).json({ message: "Yêu cầu xác thực để tạo bài đăng." });
@@ -15,7 +15,8 @@ exports.createPost = async (req, res) => {
         const newPost = new Post({
             userId,
             content,
-            image
+            image,
+            model3d: model3d || "" // ⭐️ THÊM: Lưu trường model3d vào Database
         });
 
         const savedPost = await newPost.save();
@@ -28,7 +29,8 @@ exports.createPost = async (req, res) => {
         const friends = currentUser.friends || [];
         const receivers = [...new Set([...followers, ...friends])];
 
-        const notificationContent = `đã đăng bài viết mới: "${content.substring(0, 30)}..."`;
+        // Rút gọn nội dung cho thông báo
+        const notificationContent = `đã đăng bài viết mới: "${content ? content.substring(0, 30) : "một mô hình 3D"}..."`;
         
         // 2. Xử lý THÔNG BÁO VÀ SOCKET
         if (global.io && receivers.length > 0) {
@@ -45,18 +47,18 @@ exports.createPost = async (req, res) => {
                     entityId: savedPost._id, // Liên kết đến bài viết
                     content: notificationContent
                 });
+                
+                // Populate thông tin người gửi để frontend hiển thị ngay
                 const savedNotif = await newNotification.save();
+                const populatedNotif = await Notification.findById(savedNotif._id).populate('senderId', 'username profilePicture');
                 
                 // Gửi tín hiệu real-time nếu người nhận đang online
                 const receiverSocketId = global.activeUsers.get(receiverIdStr);
                 if (receiverSocketId) {
-                    global.io.to(receiverSocketId).emit('newNotification', savedNotif);
+                    global.io.to(receiverSocketId).emit('newNotification', populatedNotif);
                 }
             }));
         }
-
-        // Tùy chọn: Phát sóng bài đăng mới lên Feed của mọi người đang online (sự kiện 'newPost')
-        // global.io.emit('newPost', savedPost);
 
         res.status(201).json({
             message: "Bài đăng đã được tạo thành công.",

@@ -203,11 +203,7 @@ const Post = ({ post }) => {
                         <span>💬</span>
                         <span className="text-sm">Bình luận</span>
                     </button>
-                    
-                    <button className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 transition duration-200">
-                        <span>📤</span>
-                        <span className="text-sm">Chia sẻ</span>
-                    </button>
+
                 </div>
             </div>
             

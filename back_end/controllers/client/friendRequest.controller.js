@@ -209,3 +209,51 @@ exports.unfriendUser = async (req, res) => {
         res.status(500).json({ message: "Lỗi Server nội bộ.", error: err.message });
     }
 };
+
+// [GET] /friends/suggestions
+exports.getSuggestedFriends = async (req, res) => {
+    const currentUserId = getCurrentUserId(req);
+
+    if (!currentUserId) {
+        return res.status(401).json({ message: "Yêu cầu xác thực." });
+    }
+
+    try {
+        const user = await User.findById(currentUserId).select('friends');
+        const myFriends = user.friends || [];
+        const pendingRequests = await FriendRequest.find({
+            $or: [{ senderId: currentUserId }, { receiverId: currentUserId }],
+            status: 'pending'
+        });
+
+        const excludedIds = [
+            currentUserId, 
+            ...myFriends,
+            ...pendingRequests.map(r => r.senderId.toString() === currentUserId ? r.receiverId : r.senderId)
+        ];
+        const suggestions = await User.find({
+            _id: { $nin: excludedIds },
+            friends: { $in: myFriends }  
+        })
+        .select('username profilePicture followers friends')
+        .limit(10); 
+        if (suggestions.length < 5) {
+            const extraSuggestions = await User.find({
+                _id: { $nin: [...excludedIds, ...suggestions.map(s => s._id)] }
+            })
+            .select('username profilePicture followers friends')
+            .limit(5 - suggestions.length);
+            
+            suggestions.push(...extraSuggestions);
+        }
+
+        res.status(200).json({
+            message: "Tải danh sách gợi ý thành công.",
+            suggestions
+        });
+
+    } catch (err) {
+        console.error("Lỗi khi lấy gợi ý kết bạn:", err);
+        res.status(500).json({ message: "Lỗi Server nội bộ.", error: err.message });
+    }
+};

@@ -10,6 +10,10 @@ const PostSchema = new mongoose.Schema({
         type: String,
         max: 500
     },
+    model3d: {
+        type: String,
+        default: ""
+    },
     image: {
         type: String 
     },

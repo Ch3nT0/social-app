@@ -16,14 +16,12 @@ export const acceptFriendRequest = async (requestId) => {
 export const rejectFriendRequest = async (requestId) => {
     const path = `${API_FRIENDS_PATH}/reject/${requestId}`;
     const result = putAuth(path, {});
-    console.log(result)
     return result; 
 };
 
 export const cancelSentRequest = async (requestId) => {
     const path = `${API_FRIENDS_PATH}/cancel/${requestId}`;
     const result = delAuth(path);
-    console.log(result);
     return result; 
 };
 
@@ -35,4 +33,9 @@ export const getPendingRequests = async (userId) => {
 export const unfriendUser = async (friendId) => {
     const path = `${API_FRIENDS_PATH}/${friendId}/unfriend`; 
     return delAuth(path); 
+};
+
+export const getSuggestedFriends = async (userId) => {
+    const path = `${API_FRIENDS_PATH}/${userId}/suggestions`;
+    return getAuth(path); 
 };

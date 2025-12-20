@@ -1,22 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import LayoutDefault from '../../../layout/LayoutDefault';
+// import LayoutDefault from '../../../layout/LayoutDefault'; // Đã comment vì bạn đang render trong component
 import { getCookie } from '../../../helpers/cookie';
 import { getPendingRequests, unfriendUser } from '../../../services/client/friendService';
-import { getSuggestedUsers, getFriendsList } from '../../../services/client/userService';
+import { getSuggestedFriends } from '../../../services/client/friendService';
+import { getFriendsList } from '../../../services/client/userService'; 
 import UserCard from '../../../components/UserCard/UserCard';
 import PendingRequestCard from '../../../components/UserCard/PendingRequestCard';
 
 const getUserId = () => getCookie('userId') || null;
 
-const FriendListItem = ({ friend, currentUserId, onUnfriendSuccess }) => {
+// Component hiển thị từng người bạn
+const FriendListItem = ({ friend, onUnfriendSuccess }) => {
     const [loading, setLoading] = useState(false);
+    
     const handleUnfriend = async () => {
         if (!window.confirm(`Bạn có chắc muốn xóa bạn với ${friend.username} không?`)) return;
         setLoading(true);
         try {
             await unfriendUser(friend._id); 
-            alert(`Đã xóa bạn với ${friend.username}.`);
             onUnfriendSuccess(friend._id); 
         } catch (error) {
             console.error("Lỗi xóa bạn:", error);
@@ -25,31 +27,30 @@ const FriendListItem = ({ friend, currentUserId, onUnfriendSuccess }) => {
             setLoading(false);
         }
     };
+
     return (
-        <div className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm border border-gray-100">
-            <div className="flex items-center space-x-3">
+        <div className="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition duration-200">
+            <div className="flex items-center space-x-4">
                 <img 
-                    className="w-10 h-10 rounded-full object-cover" 
+                    className="w-12 h-12 rounded-full object-cover border border-gray-100" 
                     src={friend.profilePicture || "https://via.placeholder.com/150/0000FF/FFFFFF?text=U"} 
                     alt={friend.username}
                 />
                 <div>
-                    <Link to={`/profile/${friend._id}`} className="font-semibold text-gray-800 hover:text-blue-600 hover:underline">
+                    <Link to={`/profile/${friend._id}`} className="font-bold text-gray-800 hover:text-blue-600 transition">
                         {friend.username}
                     </Link>
-                    <p className="text-xs text-gray-500">{friend.city || friend.desc}</p>
+                    <p className="text-xs text-gray-500">📍 {friend.city || "Chưa cập nhật địa chỉ"}</p>
                 </div>
             </div>
 
-            <div className="flex space-x-2">
-                <button 
-                    onClick={handleUnfriend}
-                    className="bg-red-500 text-white text-sm px-3 py-1 rounded-full hover:bg-red-600 transition disabled:opacity-70"
-                    disabled={loading}
-                >
-                    {loading ? 'Đang xóa...' : 'Xóa bạn'}
-                </button>
-            </div>
+            <button 
+                onClick={handleUnfriend}
+                className="bg-gray-100 text-gray-600 text-sm px-4 py-2 rounded-full hover:bg-red-50 hover:text-red-600 transition font-medium"
+                disabled={loading}
+            >
+                {loading ? '...' : 'Hủy kết bạn'}
+            </button>
         </div>
     );
 };
@@ -61,9 +62,7 @@ const FriendsPage = () => {
     const [pendingRequests, setPendingRequests] = useState([]);
     const [suggestions, setSuggestions] = useState([]);
     const [loading, setLoading] = useState(true);
-    
-    
-    // Hàm fetch dữ liệu chính
+
     const fetchData = useCallback(async () => {
         if (!currentUserId) {
             setLoading(false);
@@ -71,21 +70,19 @@ const FriendsPage = () => {
         }
         setLoading(true);
         try {
-            // Lấy dữ liệu đồng thời
-            const [friendsData, pendingData, suggestedData] = await Promise.all([
+            const [friendsData, pendingData, suggestedRes] = await Promise.all([
                 getFriendsList(currentUserId), 
                 getPendingRequests(currentUserId),
-                getSuggestedUsers(currentUserId)
+                getSuggestedFriends(currentUserId) // Gọi API gợi ý mới
             ]);
             
-            // Xử lý và lưu state
             setFriendsList(friendsData || []); 
             setPendingRequests(pendingData || []);
-            setSuggestions(suggestedData || []);
+            // Lưu ý: suggestedRes trả về { suggestions: [...] }
+            setSuggestions(suggestedRes?.suggestions || []);
 
         } catch (error) {
             console.error("Lỗi tải trang Bạn bè:", error);
-            alert("Lỗi tải dữ liệu. Vui lòng thử lại.");
         } finally {
             setLoading(false);
         }
@@ -95,110 +92,90 @@ const FriendsPage = () => {
         fetchData();
     }, [fetchData]);
     
-    // Cập nhật giao diện sau khi chấp nhận/từ chối
+    // Khi chấp nhận kết bạn
     const handleRequestStatusUpdate = useCallback((requestId, newStatus) => {
-        const acceptedRequest = pendingRequests.find(req => req._id === requestId);
-        
+        const request = pendingRequests.find(req => req._id === requestId);
         setPendingRequests(prev => prev.filter(req => req._id !== requestId));
         
-        if (newStatus === 'friend' && acceptedRequest) {
-             // Dữ liệu người gửi (sender) đã được populate trong acceptedRequest.senderId
-            setFriendsList(prev => [...prev, acceptedRequest.senderId]); 
+        if (newStatus === 'friend' && request) {
+            // Thêm người đó vào danh sách bạn bè ngay lập tức
+            setFriendsList(prev => [...prev, request.senderId]); 
         }
     }, [pendingRequests]);
     
-    // Xóa bạn bè khỏi danh sách FriendsList
+    // Khi xóa bạn bè
     const handleUnfriendFromList = useCallback((friendId) => {
         setFriendsList(prev => prev.filter(friend => friend._id !== friendId));
-        // Tùy chọn: Sau khi xóa bạn, fetch lại danh sách gợi ý để xem người đó có xuất hiện lại không
-        // fetchData(); 
     }, []);
 
-
-    if (loading) {
-        // Giả định LayoutDefault đã được khai báo ở nơi khác
-        return <LayoutDefault><div className="text-center p-8">Đang tải dữ liệu bạn bè...</div></LayoutDefault>;
-    }
-    
-    if (!currentUserId) {
-         return <LayoutDefault><div className="text-center p-8 text-red-500">Bạn cần đăng nhập để xem trang này.</div></LayoutDefault>;
-    }
-
+    if (loading) return <div className="text-center p-20 text-blue-500 font-medium">Đang tải danh sách bạn bè...</div>;
+    if (!currentUserId) return <div className="text-center p-20 text-red-500">Vui lòng đăng nhập.</div>;
 
     return (
-        <div className="friends-page pt-4 px-4 sm:px-0">
-            <h2 className="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Quản lý Bạn bè</h2>
+        <div className="friends-page max-w-4xl mx-auto py-6 px-4">
+            <h2 className="text-3xl font-extrabold text-gray-900 mb-8">Bạn bè</h2>
             
-            {/* 1. DANH SÁCH BẠN BÈ HIỆN TẠI */}
-            <div className="mb-8">
-                <h3 className="text-xl font-semibold mb-4 text-green-600 border-t pt-4">
-                    Bạn bè của tôi ({friendsList.length})
-                </h3>
-                <div className="space-y-3">
-                    {friendsList.length > 0 ? (
-                        friendsList.map(friend => (
-                            <FriendListItem 
-                                key={friend._id} 
-                                friend={friend} 
-                                currentUserId={currentUserId}
-                                onUnfriendSuccess={handleUnfriendFromList}
-                            />
-                        ))
-                    ) : (
-                        <div className="p-4 bg-white rounded-lg shadow-md text-gray-500">
-                            Bạn chưa có người bạn nào.
-                        </div>
-                    )}
-                </div>
-            </div>
-
-
-            {/* 2. LỜI MỜI KẾT BẠN ĐANG CHỜ */}
-            <div className="mb-8">
-                <h3 className="text-xl font-semibold mb-4 text-orange-600 border-t pt-4">
-                    Lời mời kết bạn đang chờ ({pendingRequests.length})
-                </h3>
-                
-                <div className="space-y-3">
-                    {pendingRequests.length > 0 ? (
-                        pendingRequests.map(req => (
+            {/* LỜI MỜI KẾT BẠN */}
+            {pendingRequests.length > 0 && (
+                <section className="mb-10">
+                    <h3 className="text-lg font-bold mb-4 text-orange-500 flex items-center">
+                        🔔 Lời mời kết bạn ({pendingRequests.length})
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {pendingRequests.map(req => (
                             <PendingRequestCard 
                                 key={req._id} 
                                 request={req} 
                                 currentUserId={currentUserId}
                                 onActionSuccess={handleRequestStatusUpdate}
                             />
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* DANH SÁCH BẠN BÈ */}
+            <section className="mb-10">
+                <h3 className="text-lg font-bold mb-4 text-gray-800 border-b pb-2">
+                    Bạn bè hiện tại ({friendsList.length})
+                </h3>
+                <div className="grid grid-cols-1 gap-3">
+                    {friendsList.length > 0 ? (
+                        friendsList.map(friend => (
+                            <FriendListItem 
+                                key={friend._id} 
+                                friend={friend} 
+                                onUnfriendSuccess={handleUnfriendFromList}
+                            />
                         ))
                     ) : (
-                        <div className="p-4 bg-white rounded-lg shadow-md text-gray-500">
-                            Hiện không có lời mời kết bạn mới nào.
-                        </div>
+                        <p className="text-gray-500 italic p-4 bg-gray-50 rounded-lg">Bạn chưa có người bạn nào. Hãy kết nối thêm nhé!</p>
                     )}
                 </div>
-            </div>
+            </section>
 
-            <div>
-                <h3 className="text-xl font-semibold mb-4 text-blue-600 border-t pt-4">
-                    Gợi ý Kết bạn ({suggestions.length})
+            {/* GỢI Ý KẾT BẠN */}
+            <section>
+                <h3 className="text-lg font-bold mb-4 text-blue-600 border-b pb-2">
+                    Gợi ý dành cho bạn
                 </h3>
-                
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-4">
                     {suggestions.length > 0 ? (
                         suggestions.map(user => (
                             <UserCard 
                                 key={user._id} 
                                 user={user} 
-                                onUpdateStatus={() => fetchData()} 
+                                onUpdateStatus={() => {
+                                    // Khi bấm kết bạn ở Card gợi ý, ẩn người đó đi hoặc fetch lại
+                                    setSuggestions(prev => prev.filter(s => s._id !== user._id));
+                                }} 
                             />
                         ))
                     ) : (
-                        <div className="p-4 bg-white rounded-lg shadow-md text-gray-500">
-                            Hiện không có gợi ý nào.
-                        </div>
+                        <p className="text-gray-400 text-sm">Không có gợi ý mới.</p>
                     )}
                 </div>
-            </div>
-            
+            </section>
         </div>
     );
 };
