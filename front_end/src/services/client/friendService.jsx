@@ -39,3 +39,8 @@ export const getSuggestedFriends = async (userId) => {
     const path = `${API_FRIENDS_PATH}/${userId}/suggestions`;
     return getAuth(path); 
 };
+
+export const getCheckRequests = async (userId) => {
+    const path = `${API_FRIENDS_PATH}/check_requests/${userId}`;
+    return getAuth(path); 
+};

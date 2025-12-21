@@ -257,3 +257,36 @@ exports.getSuggestedFriends = async (req, res) => {
         res.status(500).json({ message: "Lỗi Server nội bộ.", error: err.message });
     }
 };
+
+// [GET] /friends/check_requests/:userId 
+exports.getCheckRequests = async (req, res) => {
+    const receiverId = req.params.userId; 
+    const senderId = req.user.userId;
+    console.log("Checking friend requests between:", senderId, "and", receiverId);
+    try {
+        // Tìm lời mời giữa 2 người (A gửi B hoặc B gửi A)
+        const request = await FriendRequest.findOne({
+            $or: [
+                { senderId: senderId, receiverId: receiverId },
+                { senderId: receiverId, receiverId: senderId }
+            ]
+        }).populate('senderId receiverId', 'username profilePicture');
+
+        if (!request) {
+            return res.status(200).json({ status: "none", message: "Không có yêu cầu kết bạn nào." });
+        }
+
+        // Xác định vai trò của người dùng hiện tại
+        const isSender = request.senderId._id.toString() === senderId.toString();
+
+        res.status(200).json({
+            status: request.status, // 'pending', 'accepted', v.v.
+            isCurrentUserSource: isSender, // true nếu bạn là người gửi, false nếu bạn là người nhận
+            requestDetails: request
+        });
+
+    } catch (err) {
+        console.error("Lỗi khi kiểm tra lời mời:", err);
+        res.status(500).json({ message: "Lỗi Server nội bộ.", error: err.message });
+    }
+};

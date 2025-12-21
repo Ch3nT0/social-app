@@ -6,6 +6,9 @@ import { getUserProfile } from '../../../services/client/userService';
 import { getUserPosts } from '../../../services/client/postService';
 import { getCookie } from '../../../helpers/cookie';
 import { followUser, unfollowUser } from '../../../services/client/userService';
+import { getCheckRequests, sendFriendRequest, unfriendUser } from '../../../services/client/friendService';
+import { getPendingRequests } from '../../../services/client/friendService';
+import { cancelSentRequest } from '../../../services/client/friendService';
 
 // Hàm lấy ID người dùng hiện tại từ cookie
 const getCurrentUserId = () => getCookie('userId') || null;
@@ -17,18 +20,14 @@ const Profile = () => {
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [isFriend, setIsFriend] = useState(false);
+    const [isRequestSent, setIsRequestSent] = useState(false);
 
-    // ⭐️ Lấy ID động từ cookie
     const loggedInUserId = getCurrentUserId();
-
     const [isFollowing, setIsFollowing] = useState(false);
 
-    // Xác định xem người xem có phải là chủ hồ sơ không
     const isOwner = profileId === loggedInUserId;
 
-    // ----------------------------------------------------
-    // EFFECTS & FETCH DATA
-    // ----------------------------------------------------
     const handleNewPostCreated = (newPost) => {
         setPosts((prevPosts) => [newPost, ...prevPosts]);
     };
@@ -46,8 +45,21 @@ const Profile = () => {
                 // Kiểm tra trạng thái theo dõi (chỉ khi không phải là chủ sở hữu)
                 if (userData && Array.isArray(userData.followers) && loggedInUserId) {
                     setIsFollowing(userData.followers.includes(loggedInUserId));
+                    setIsFriend(userData.friends?.includes(loggedInUserId));    
+                    setIsRequestSent(userData.isRequestSent);                
                 }
+                
+                // Kiểm tra đã gửi lời mời hay chưa
+                const pending = await getCheckRequests(profileId);
+                console.log("Pending requests fetched:", pending);
+                // const sentRequest = pending?.some(
+                //     req =>
+                //         req.senderId === loggedInUserId &&
+                //         req.receiverId === profileId
+                // );
 
+                // setIsRequestSent(sentRequest);
+    
                 const userPosts = await getUserPosts(profileId);
 
                 if (Array.isArray(userPosts)) {
@@ -70,6 +82,42 @@ const Profile = () => {
 
         fetchData();
     }, [profileId, loggedInUserId]);
+
+    const handleFriendAction = async () => {
+        if (!loggedInUserId) {
+            alert("Vui lòng đăng nhập");
+            return;
+        }
+
+        try {
+            if (isFriend) {
+                if (!window.confirm("Xóa kết bạn với người này?")) return;
+
+                await unfriendUser(profileId);
+
+                setIsFriend(false);
+                setUser(prev => ({
+                    ...prev,
+                    friends: prev.friends.filter(id => id !== loggedInUserId)
+                }));
+            }
+
+            else if (isRequestSent) {
+                await cancelSentRequest(profileId); 
+                setIsRequestSent(false);
+                alert("Đã hủy lời mời kết bạn");
+            }
+
+            else {
+                await sendFriendRequest(profileId);
+                setIsRequestSent(true);
+                alert("Đã gửi lời mời kết bạn");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Thao tác thất bại");
+        }
+    };
 
 
     const handleFollow = async () => {
@@ -150,6 +198,24 @@ const Profile = () => {
                                 >
                                     {isFollowing ? 'Hủy Theo dõi' : 'Theo dõi'}
                                 </button>
+
+                               <button
+                                    onClick={handleFriendAction}
+                                    className={`px-4 py-2 rounded-full font-semibold transition
+                                        ${isFriend
+                                            ? 'bg-gray-300 text-gray-800 hover:bg-gray-400'
+                                            : isRequestSent
+                                                ? 'bg-yellow-400 text-white hover:bg-yellow-500'
+                                                : 'bg-green-500 text-white hover:bg-green-600'
+                                        }`}
+                                >
+                                    {isFriend
+                                        ? 'Xóa bạn'
+                                        : isRequestSent
+                                            ? 'Hủy lời mời'
+                                            : 'Kết bạn'
+                                    }
+                                </button>
                             </>
                         )}
                     </div>
@@ -161,10 +227,10 @@ const Profile = () => {
                 <div className="w-full lg:w-1/3 space-y-4">
                     <div className="bg-white rounded-xl shadow-lg p-5">
                         <h3 className="text-xl font-bold mb-3 border-b pb-2">Thông tin</h3>
-                        <p className="text-gray-700">📍 Sống tại: **{user.city || "Chưa rõ"}**</p>
-                        <p className="text-gray-700">🏡 Đến từ: **{user.from || "Chưa rõ"}**</p>
-                        <p className="text-gray-700">👥 **{user.friends.length}** Bạn bè</p>
-                        <p className="text-gray-700">👀 **{user.followers.length}** Người theo dõi</p>
+                        <p className="text-gray-700">📍 Sống tại: {user.city || "Chưa rõ"}</p>
+                        <p className="text-gray-700">🏡 Đến từ: {user.from || "Chưa rõ"}</p>
+                        <p className="text-gray-700">👥 {user.friends.length} Bạn bè</p>
+                        <p className="text-gray-700">👀 {user.followers.length} Người theo dõi</p>
                     </div>
                 </div>
 
