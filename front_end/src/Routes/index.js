@@ -7,6 +7,7 @@ import Register from "../pages/client/register";
 import SearchFriendsPage from "../pages/client/SearchFriendsPage";
 import FriendsPage from "../pages/client/FriendsPage/FriendsPage";
 import EditProfilePage from "../pages/EditProfile";
+import UnityGame from "../components/UnityGame/UnityGame";
 
 
 const URL_ADMIN = '/admin'
@@ -44,6 +45,10 @@ export const routes = [
     {
         path: '/register',
         element: <Register />
+    },
+    {
+        path: '/tank-game',
+        element: <UnityGame />
     },
     {
         path: URL_ADMIN,
