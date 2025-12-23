@@ -25,16 +25,14 @@ const Share = ({ onPostCreated, userAvatar, userName }) => {
 
         setIsUploading(true);
         let imageUrls = [];
-        let videoUrl = ""; // Backend chỉ nhận 1 chuỗi video
+        let videoUrl = ""; 
         let model3dUrl = "";
 
         try {
-            // Duyệt qua tất cả các file đã chọn để upload
             for (const file of files) {
                 const is3D = file.name.endsWith('.glb');
                 const isVideo = file.type.startsWith('video/');
                 
-                // Xác định type cho hàm handleUpload của bạn
                 const uploadType = is3D ? "3d" : (isVideo ? "video" : "image");
                 
                 const url = await handleUpload(file, uploadType);
@@ -42,7 +40,7 @@ const Share = ({ onPostCreated, userAvatar, userName }) => {
                 if (is3D) {
                     model3dUrl = url;
                 } else if (isVideo) {
-                    videoUrl = url; // Lấy video cuối cùng nếu user chọn nhiều video
+                    videoUrl = url; 
                 } else {
                     imageUrls.push(url);
                 }
@@ -68,7 +66,6 @@ const Share = ({ onPostCreated, userAvatar, userName }) => {
                     profilePicture: userAvatar
                 };
                 
-                // Trộn dữ liệu để hiển thị ngay lập tức lên Feed (Optimistic UI)
                 const finalPost = { 
                     ...result.post, 
                     userId: populatedUser

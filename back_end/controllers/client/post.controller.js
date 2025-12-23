@@ -5,7 +5,7 @@ const Notification = require('../../models/notification.model');
 // [POST] /posts
 exports.createPost = async (req, res) => {
     const userId = req.user?.id || req.body.userId; 
-    const { content, image, model3d, video } = req.body;
+    const { content, image, model3d, video,visibility } = req.body;
 
     if (!userId) {
         return res.status(401).json({ message: "Yêu cầu xác thực để tạo bài đăng." });
@@ -18,7 +18,8 @@ exports.createPost = async (req, res) => {
             content,
             image: image || [],
             model3d: model3d || "",
-            video: video || "" 
+            video: video || "" ,
+            visibility: visibility || "public"
         });
 
         const savedPost = await newPost.save();

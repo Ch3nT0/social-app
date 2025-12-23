@@ -14,10 +14,10 @@ const SidebarLeft = () => {
     // Danh sách mục mặc định
     const menuItems = [
         {
-            path: userID ? `/profile/${userID}` : '/login', // Nếu ko có ID, đẩy về login
+            path: userID ? `/profile/${userID}` : '/login', 
             label: 'Hồ sơ cá nhân',
             icon: '👤',
-            requiresAuth: true // Đánh dấu mục này cần đăng nhập
+            requiresAuth: true 
         },
         {
             path: '/friends',
