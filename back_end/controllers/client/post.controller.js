@@ -5,54 +5,64 @@ const Notification = require('../../models/notification.model');
 // [POST] /posts
 exports.createPost = async (req, res) => {
     const userId = req.user?.id || req.body.userId; 
-    const { content, image, model3d } = req.body;
+    const { content, image, model3d, video } = req.body;
 
     if (!userId) {
         return res.status(401).json({ message: "Yêu cầu xác thực để tạo bài đăng." });
     }
 
     try {
+        // 1. Tạo bản ghi bài viết mới
         const newPost = new Post({
             userId,
             content,
-            image,
-            model3d: model3d || "" // ⭐️ THÊM: Lưu trường model3d vào Database
+            image: image || [],
+            model3d: model3d || "",
+            video: video || "" 
         });
 
         const savedPost = await newPost.save();
         
-        // 1. Lấy thông tin người đăng và danh sách người nhận
+        // 2. Lấy thông tin người đăng để xử lý thông báo
         const currentUser = await User.findById(userId);
         
         // Gộp ID người theo dõi và ID bạn bè (loại bỏ trùng lặp)
         const followers = currentUser.followers || [];
         const friends = currentUser.friends || [];
-        const receivers = [...new Set([...followers, ...friends])];
+        const receivers = [...new Set([...followers.map(id => id.toString()), ...friends.map(id => id.toString())])];
 
-        // Rút gọn nội dung cho thông báo
-        const notificationContent = `đã đăng bài viết mới: "${content ? content.substring(0, 30) : "một mô hình 3D"}..."`;
+        // Rút gọn nội dung cho thông báo dựa trên loại media
+        let mediaTypeLabel = "bài viết mới";
+        if (video) mediaTypeLabel = "một video mới";
+        else if (model3d) mediaTypeLabel = "một mô hình 3D";
+        else if (image && image.length > 0) mediaTypeLabel = "ảnh mới";
+
+        const notificationContent = `đã đăng ${mediaTypeLabel}: "${content ? content.substring(0, 30) : ""}..."`;
         
-        // 2. Xử lý THÔNG BÁO VÀ SOCKET
+        // 3. Xử lý THÔNG BÁO VÀ SOCKET REAL-TIME
         if (global.io && receivers.length > 0) {
-            
-            // Xử lý thông báo đồng thời (Promise.all) để tối ưu
-            await Promise.all(receivers.map(async (receiverId) => {
-                const receiverIdStr = receiverId.toString();
+            // Tối ưu hóa: Không dùng await bên trong vòng lặp map đơn lẻ nếu danh sách quá lớn, 
+            // nhưng với Notification cần lưu DB nên dùng Promise.all là hợp lý.
+            await Promise.all(receivers.map(async (receiverIdStr) => {
+                // Không gửi thông báo cho chính mình
+                if (receiverIdStr === userId.toString()) return;
 
                 // Tạo bản ghi thông báo
                 const newNotification = new Notification({
                     senderId: userId,
                     receiverId: receiverIdStr,
                     type: 'new_post',
-                    entityId: savedPost._id, // Liên kết đến bài viết
+                    entityId: savedPost._id,
                     content: notificationContent
                 });
                 
-                // Populate thông tin người gửi để frontend hiển thị ngay
                 const savedNotif = await newNotification.save();
-                const populatedNotif = await Notification.findById(savedNotif._id).populate('senderId', 'username profilePicture');
                 
-                // Gửi tín hiệu real-time nếu người nhận đang online
+                // Populate thông tin người gửi để frontend hiển thị avatar/tên ngay lập tức
+                const populatedNotif = await Notification.findById(savedNotif._id)
+                    .populate('senderId', 'username profilePicture');
+                
+                // Gửi tín hiệu real-time qua Socket.io
                 const receiverSocketId = global.activeUsers.get(receiverIdStr);
                 if (receiverSocketId) {
                     global.io.to(receiverSocketId).emit('newNotification', populatedNotif);
@@ -206,33 +216,54 @@ exports.getPost = async (req, res) => {
     }
 };
 
-//[GET] /posts/timeline/:userId 
+// [GET] /posts/timeline/:userId
 exports.getTimelinePosts = async (req, res) => {
-    const currentUserId = req.params.userId;
+    const observerId = req.user?.userId; 
     try {
-        const currentUser = await User.findById(currentUserId);
+        if (!observerId) {
+            const publicPosts = await Post.find({ visibility: 'public' })
+                .populate('userId', 'username profilePicture')
+                .sort({ createdAt: -1 })
+                .limit(50)
+                .exec();
+            return res.status(200).json(publicPosts);
+        }
+        const currentUser = await User.findById(observerId);
         if (!currentUser) {
             return res.status(404).json({ message: "Người dùng không tồn tại." });
         }
         const followingIds = currentUser.following || [];
         const friendIds = currentUser.friends || [];
-        const allRelevantIds = [...new Set([...followingIds, ...friendIds])];
-        const [currentUserPosts, externalPosts] = await Promise.all([
+        
+        // Gộp danh sách người liên quan
+        const allRelevantIds = [...new Set([...followingIds.map(id => id.toString()), ...friendIds.map(id => id.toString())])];
 
-            Post.find({ userId: currentUserId })
+        const [currentUserPosts, externalPosts] = await Promise.all([
+            Post.find({ userId: observerId })
                 .populate('userId', 'username profilePicture')
                 .sort({ createdAt: -1 })
                 .exec(),
 
-            Post.find({ userId: { $in: allRelevantIds } })
+            Post.find({
+                userId: { $in: allRelevantIds },
+                $or: [
+                    { visibility: 'public' }, 
+                    { 
+                        visibility: 'friends', 
+                        userId: { $in: friendIds } 
+                    }
+                ]
+            })
                 .populate('userId', 'username profilePicture')
                 .sort({ createdAt: -1 })
                 .limit(50)
                 .exec()
         ]);
 
+        // Gộp và sắp xếp lại
         const allPosts = currentUserPosts.concat(externalPosts);
         allPosts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        
         res.status(200).json(allPosts);
     } catch (err) {
         console.error("Lỗi khi lấy dòng thời gian:", err);
@@ -242,16 +273,49 @@ exports.getTimelinePosts = async (req, res) => {
 
 // [GET] /posts/user/:userId
 exports.getUserPosts = async (req, res) => {
-    const userId = req.params.userId;
-    
+    const targetUserId = req.params.userId; 
+    const observerId = req.user?.userId;    
+
     try {
-        const userPosts = await Post.find({ userId: userId })
+        let query = { userId: targetUserId };
+        if (observerId !== targetUserId) {
+            let isFriend = false;            
+            if (observerId) {
+                const observerUser = await User.findById(observerId);
+                isFriend = observerUser?.friends.includes(targetUserId);
+            }
+
+            query.$or = [
+                { visibility: 'public' },
+                ...(isFriend ? [{ visibility: 'friends' }] : [])
+            ];
+        }
+        const userPosts = await Post.find(query)
             .populate('userId', 'username profilePicture') 
             .sort({ createdAt: -1 });
 
         res.status(200).json(userPosts);
     } catch (err) {
-        console.error("Lỗi khi lấy bài đăng của người dùng:", err);
+        console.error("Lỗi khi lấy bài đăng:", err);
         res.status(500).json({ message: "Lỗi Server nội bộ.", error: err.message });
+    }
+};
+
+// [PATCH] /posts/:id/visibility
+exports.updateVisibility = async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
+        if (!post) return res.status(404).json("Không tìm thấy bài viết");
+
+        if (post.userId.toString() !== req.user.userId) {
+            return res.status(403).json("Bạn chỉ có thể chỉnh sửa bài viết của chính mình");
+        }
+
+        post.visibility = req.body.visibility;
+        await post.save();
+
+        res.status(200).json({ message: "Cập nhật quyền riêng tư thành công", visibility: post.visibility });
+    } catch (err) {
+        res.status(500).json(err);
     }
 };

@@ -18,13 +18,23 @@ const PostSchema = new mongoose.Schema({
         type: [String],
         default: []
     },
+    video: {
+        type: String,
+        default: ""
+    },
+    visibility: {
+        type: String,
+        enum: ['public', 'friends', 'private'],
+        default: 'public'
+    },
     likes: {
-        type: Array,
+        type: [mongoose.Schema.Types.ObjectId],
+        ref: 'User',
         default: []
     },
     commentsCount: {
         type: Number,
-        default: 0 // Số lượng comment (dùng để hiển thị nhanh)
+        default: 0
     }
 },
     { timestamps: true }

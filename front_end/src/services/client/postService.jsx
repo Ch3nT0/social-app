@@ -1,4 +1,4 @@
-import { getAuth, postAuth, delAuth, putAuth } from "../../utils/request"; 
+import { getAuth, postAuth, delAuth, putAuth, patchAuth } from "../../utils/request"; 
 
 const API_POSTS_PATH = "/posts";
 
@@ -30,5 +30,11 @@ export const deletePost = async (postId) => {
 export const getUserPosts = async (userId) => {
     const path = `${API_POSTS_PATH}/user/${userId}`;
     const result = await getAuth(path); 
+    return result; 
+}
+
+export const updateVisibility = async (postId, visibility) => {
+    const path = `${API_POSTS_PATH}/${postId}/visibility`;
+    const result = await patchAuth(path, { visibility }); 
     return result; 
 }

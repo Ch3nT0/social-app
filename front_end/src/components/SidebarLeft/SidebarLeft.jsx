@@ -1,5 +1,5 @@
-import React, { useState } from 'react'; // Thêm useState
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom'; // Thêm useNavigate
 import { getCookie } from '../../helpers/cookie';
 
 const getUserId = () => getCookie('userId') || null; 
@@ -7,31 +7,44 @@ const getUserId = () => getCookie('userId') || null;
 const SidebarLeft = () => {
     const userID = getUserId();
     const location = useLocation();
+    const navigate = useNavigate(); // Hook để điều hướng
     
-    // Quản lý trạng thái đóng/mở của phần "Xem thêm"
     const [isExpanded, setIsExpanded] = useState(false);
 
+    // Danh sách mục mặc định
     const menuItems = [
         {
-            path: `/profile/${userID}`,
+            path: userID ? `/profile/${userID}` : '/login', // Nếu ko có ID, đẩy về login
             label: 'Hồ sơ cá nhân',
             icon: '👤',
+            requiresAuth: true // Đánh dấu mục này cần đăng nhập
         },
         {
             path: '/friends',
             label: 'Bạn bè',
             icon: '👥',
+            requiresAuth: true
         }
     ];
 
-    // Danh sách các mục ẩn khi nhấn "Xem thêm" mới hiện
+    // Các mục mở rộng
     const extraMenuItems = [
         {
-            path: '/tank-game', // Đường dẫn này phải khớp với Route bạn đặt ở App.js
+            path: '/tank-game',
             label: 'Chơi Game Xe Tăng',
             icon: '🎮',
+            requiresAuth: true
         }
     ];
+
+    // Hàm xử lý khi click vào item
+    const handleItemClick = (e, item) => {
+        if (item.requiresAuth && !userID) {
+            e.preventDefault(); // Chặn Link mặc định
+            alert("Vui lòng đăng nhập để sử dụng tính năng này!");
+            navigate('/login'); // Chuyển sang trang đăng nhập
+        }
+    };
 
     return (
         <div className="p-4 bg-white rounded-xl shadow-lg sticky top-20 border border-gray-100">
@@ -40,19 +53,27 @@ const SidebarLeft = () => {
             </h3>
             
             <ul className="space-y-2">
-                {/* Render các mục mặc định */}
                 {menuItems.map((item) => {
                     const isActive = location.pathname === item.path;
                     return (
-                        <MenuItem key={item.path} item={item} isActive={isActive} />
+                        <MenuItem 
+                            key={item.label} 
+                            item={item} 
+                            isActive={isActive} 
+                            onClick={(e) => handleItemClick(e, item)} 
+                        />
                     );
                 })}
 
-                {/* Render các mục mở rộng nếu isExpanded = true */}
                 {isExpanded && extraMenuItems.map((item) => {
                     const isActive = location.pathname === item.path;
                     return (
-                        <MenuItem key={item.path} item={item} isActive={isActive} />
+                        <MenuItem 
+                            key={item.path} 
+                            item={item} 
+                            isActive={isActive} 
+                            onClick={(e) => handleItemClick(e, item)}
+                        />
                     );
                 })}
 
@@ -72,11 +93,11 @@ const SidebarLeft = () => {
     );
 };
 
-// Tách nhỏ component Item để code sạch hơn
-const MenuItem = ({ item, isActive }) => (
+const MenuItem = ({ item, isActive, onClick }) => (
     <li>
         <Link 
             to={item.path} 
+            onClick={onClick} // Gắn sự kiện kiểm tra tại đây
             className={`flex items-center p-2.5 rounded-lg transition duration-200 group ${
                 isActive 
                 ? 'bg-blue-50 text-blue-600' 

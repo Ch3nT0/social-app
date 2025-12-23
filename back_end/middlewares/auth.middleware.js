@@ -45,7 +45,7 @@ const optionalVerifyToken = (req, res, next) => {
         return next(); 
     }
     const token = authHeader.split(" ")[1]; 
-    jwt.verify(token, process.env.JWT_SECRET || "social_app_secret_key", (err, user) => {
+    jwt.verify(token, process.env.JWT_SECRET , (err, user) => {
         if (err) {
             req.user = null;
             return next();

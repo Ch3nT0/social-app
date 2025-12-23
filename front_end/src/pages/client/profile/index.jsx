@@ -7,8 +7,8 @@ import { getUserPosts } from '../../../services/client/postService';
 import { getCookie } from '../../../helpers/cookie';
 import { followUser, unfollowUser } from '../../../services/client/userService';
 import { getCheckRequests, sendFriendRequest, unfriendUser } from '../../../services/client/friendService';
-import { getPendingRequests } from '../../../services/client/friendService';
 import { cancelSentRequest } from '../../../services/client/friendService';
+import { acceptFriendRequest } from '../../../services/client/friendService';
 
 // Hàm lấy ID người dùng hiện tại từ cookie
 const getCurrentUserId = () => getCookie('userId') || null;
@@ -21,7 +21,10 @@ const Profile = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isFriend, setIsFriend] = useState(false);
-    const [isRequestSent, setIsRequestSent] = useState(false);
+    const [friendRequestStatus, setFriendRequestStatus] = useState("none");
+    const [isRequestSender, setIsRequestSender] = useState(false);
+    const [friendRequestId, setFriendRequestId] = useState(null);
+
 
     const loggedInUserId = getCurrentUserId();
     const [isFollowing, setIsFollowing] = useState(false);
@@ -45,20 +48,30 @@ const Profile = () => {
                 // Kiểm tra trạng thái theo dõi (chỉ khi không phải là chủ sở hữu)
                 if (userData && Array.isArray(userData.followers) && loggedInUserId) {
                     setIsFollowing(userData.followers.includes(loggedInUserId));
-                    setIsFriend(userData.friends?.includes(loggedInUserId));    
-                    setIsRequestSent(userData.isRequestSent);                
+                    setIsFriend(userData.friends?.includes(loggedInUserId));                
                 }
                 
                 // Kiểm tra đã gửi lời mời hay chưa
-                const pending = await getCheckRequests(profileId);
-                console.log("Pending requests fetched:", pending);
-                // const sentRequest = pending?.some(
-                //     req =>
-                //         req.senderId === loggedInUserId &&
-                //         req.receiverId === profileId
-                // );
+                const checkRes = await getCheckRequests(profileId);
+                console.log("Check request result:", checkRes);
 
-                // setIsRequestSent(sentRequest);
+                if (checkRes?.status) {
+                    setFriendRequestStatus(checkRes.status);
+
+                    if (checkRes.status === "pending") {
+                        setIsRequestSender(checkRes.isCurrentUserSource);
+                        setFriendRequestId(checkRes.requestDetails?._id);
+                    }
+
+                    if (checkRes.status === "accepted") {
+                        setIsFriend(true);
+                    }
+                } else {
+                    setFriendRequestStatus("none");
+                    setIsRequestSender(false);
+                    setFriendRequestId(null);
+                }
+
     
                 const userPosts = await getUserPosts(profileId);
 
@@ -94,30 +107,39 @@ const Profile = () => {
                 if (!window.confirm("Xóa kết bạn với người này?")) return;
 
                 await unfriendUser(profileId);
-
                 setIsFriend(false);
-                setUser(prev => ({
-                    ...prev,
-                    friends: prev.friends.filter(id => id !== loggedInUserId)
-                }));
+                setFriendRequestStatus("none");
+                return;
             }
 
-            else if (isRequestSent) {
-                await cancelSentRequest(profileId); 
-                setIsRequestSent(false);
+            if (friendRequestStatus === "pending" && isRequestSender) {
+                await cancelSentRequest(profileId);
+                setFriendRequestStatus("none");
+                setIsRequestSender(false);
                 alert("Đã hủy lời mời kết bạn");
+                return;
             }
 
-            else {
-                await sendFriendRequest(profileId);
-                setIsRequestSent(true);
-                alert("Đã gửi lời mời kết bạn");
+            if (friendRequestStatus === "pending" && !isRequestSender) {
+                await acceptFriendRequest(friendRequestId);
+                setFriendRequestStatus("accepted");
+                setIsFriend(true);
+                setFriendRequestId(null);
+                alert("Đã chấp nhận lời mời kết bạn");
+                return;
             }
+
+            await sendFriendRequest(profileId);
+            setFriendRequestStatus("pending");
+            setIsRequestSender(true);
+            alert("Đã gửi lời mời kết bạn");
+
         } catch (error) {
             console.error(error);
             alert("Thao tác thất bại");
         }
     };
+
 
 
     const handleFollow = async () => {
@@ -202,18 +224,23 @@ const Profile = () => {
                                <button
                                     onClick={handleFriendAction}
                                     className={`px-4 py-2 rounded-full font-semibold transition
-                                        ${isFriend
-                                            ? 'bg-gray-300 text-gray-800 hover:bg-gray-400'
-                                            : isRequestSent
-                                                ? 'bg-yellow-400 text-white hover:bg-yellow-500'
-                                                : 'bg-green-500 text-white hover:bg-green-600'
+                                        ${
+                                            isFriend
+                                                ? 'bg-gray-300 text-gray-800 hover:bg-gray-400'
+                                                : friendRequestStatus === "pending" && isRequestSender
+                                                    ? 'bg-yellow-400 text-white hover:bg-yellow-500'
+                                                    : friendRequestStatus === "pending"
+                                                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                                        : 'bg-green-500 text-white hover:bg-green-600'
                                         }`}
                                 >
                                     {isFriend
                                         ? 'Xóa bạn'
-                                        : isRequestSent
+                                        : friendRequestStatus === "pending" && isRequestSender
                                             ? 'Hủy lời mời'
-                                            : 'Kết bạn'
+                                            : friendRequestStatus === "pending"
+                                                ? 'Chấp nhận lời mời'
+                                                : 'Kết bạn'
                                     }
                                 </button>
                             </>
