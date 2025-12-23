@@ -8,7 +8,8 @@ import SearchFriendsPage from "../pages/client/SearchFriendsPage";
 import FriendsPage from "../pages/client/FriendsPage/FriendsPage";
 import EditProfilePage from "../pages/EditProfile";
 import UnityGame from "../components/UnityGame/UnityGame";
-import PrivateRoute from "../components/PrivateRoutes/index"; 
+import PrivateRoute from "../components/PrivateRoutes/index";
+import ForgotPassword from "../pages/client/ForgotPassword";
 const URL_ADMIN = '/admin'
 
 export const routes = [
@@ -18,18 +19,18 @@ export const routes = [
         children: [
             {
                 path: '/',
-                element: <Home /> 
+                element: <Home />
             },
             {
                 path: '/profile/:id',
-                element: <Profile /> 
+                element: <Profile />
             },
             {
                 path: '/search/friends',
                 element: <SearchFriendsPage />
             },
             {
-                element: <PrivateRoute />, 
+                element: <PrivateRoute />,
                 children: [
                     {
                         path: '/friends',
@@ -37,15 +38,15 @@ export const routes = [
                     },
                     {
                         path: '/profile/edit',
-                        element: <EditProfilePage/>
-                    },
-                    {
-                        path: '/tank-game',
-                        element: <UnityGame />
+                        element: <EditProfilePage />
                     }
                 ]
             }
         ]
+    },
+    {
+        path: '/tank-game',
+        element: <UnityGame />
     },
     {
         path: '/login',
@@ -54,6 +55,9 @@ export const routes = [
     {
         path: '/register',
         element: <Register />
+    }, {
+        path: '/forgot-password',
+        element: <ForgotPassword />
     },
     {
         path: URL_ADMIN,
